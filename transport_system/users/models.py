@@ -5,6 +5,7 @@ Supports email-based authentication with role-based access
 
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
+from zones.models import Zone   # ✅ NEW IMPORT
 
 
 class CustomUserManager(BaseUserManager):
@@ -39,7 +40,8 @@ class CustomUserManager(BaseUserManager):
         """
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
-        extra_fields.setdefault('role', 'admin')
+        extra_fields.setdefault('role', 'admin')   # SUPERUSER ALWAYS ADMIN
+        extra_fields.setdefault('zone', None)      # SUPERUSER NOT TIED TO ZONE
 
         if extra_fields.get('is_staff') is not True:
             raise ValueError('Superuser must have is_staff=True.')
@@ -53,15 +55,17 @@ class CustomUser(AbstractUser):
     """
     Custom User Model
     - Uses email instead of username for authentication
-    - Has role field for access control (passenger, driver, admin)
+    - Has role field for access control (passenger, driver, zonal admin, admin)
     """
+
     username = None  # Remove username field
     email = models.EmailField(unique=True, verbose_name='Email Address')
-    
+
     # Role-based access control
     ROLE_CHOICES = (
         ('passenger', 'Passenger'),
         ('driver', 'Driver'),
+        ('zonal_admin', 'Zonal Admin'),   # ✅ NEW ROLE
         ('admin', 'Admin'),
     )
     role = models.CharField(
@@ -70,14 +74,24 @@ class CustomUser(AbstractUser):
         default='passenger',
         help_text='User role in the system'
     )
-    
+
+    # Assigned zone (for drivers + zonal admins)
+    zone = models.ForeignKey(
+        Zone,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='users',
+        help_text="Zone for zonal admins and drivers"
+    )
+
     # Set email as the unique identifier
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []  # Email & Password are required by default
-    
+
     # Use custom manager
     objects = CustomUserManager()
-    
+
     class Meta:
         verbose_name = 'User'
         verbose_name_plural = 'Users'
@@ -85,7 +99,7 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return f"{self.email} ({self.get_role_display()})"
-    
+
     def get_full_name(self):
         """
         Return the first_name plus the last_name, with a space in between.

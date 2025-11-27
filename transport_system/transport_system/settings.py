@@ -52,6 +52,8 @@ INSTALLED_APPS = [
     'preinforms',
     'demand',
     'operations',
+    'zones',
+    'zonaladmin',
 ]
 
 MIDDLEWARE = [

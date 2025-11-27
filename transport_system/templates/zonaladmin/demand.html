@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Demand Alerts</title>
+    <style>
+        body{ font-family:Arial; background:#f3f6fc; }
+        .container{ width:95%; margin:auto; padding:20px; }
+        .header{ background:#004aad; padding:15px; color:white; }
+        table{ width:100%; border-collapse:collapse; margin-top:15px; }
+        th,td{ padding:10px; border-bottom:1px solid #ddd; }
+        th{ background:#e8e8e8; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h2>Demand Alerts – {{ user.zone }}</h2>
+</div>
+
+<div class="container">
+    <table>
+        <tr>
+            <th>Stop</th>
+            <th>Level</th>
+            <th>Status</th>
+            <th>Time</th>
+        </tr>
+
+        {% for d in alerts %}
+        <tr>
+            <td>{{ d.stop.name }}</td>
+            <td>{{ d.level }}</td>
+            <td>{{ d.status }}</td>
+            <td>{{ d.created_at }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</div>
+
+</body>
+</html>

@@ -4,6 +4,7 @@ Defines bus routes and their stops
 """
 
 from django.db import models
+from zones.models import Zone   # ✅ NEW: link routes to zones
 
 
 class Route(models.Model):
@@ -26,7 +27,7 @@ class Route(models.Model):
         null=True,
         help_text="Optional route description"
     )
-    
+
     # Route details
     origin = models.CharField(
         max_length=100,
@@ -47,7 +48,7 @@ class Route(models.Model):
         default=1.0,
         help_text="Duration of trip in hours (e.g., 1.5 for 1 hour 30 minutes)"
     )
-    
+
     # Operational timings
     turnaround_time = models.DecimalField(
         max_digits=4,
@@ -61,35 +62,48 @@ class Route(models.Model):
         default=0.16,
         help_text="Buffer time for delays in hours (e.g., 0.16 for 10 minutes)"
     )
-    
+
+    # ✅ NEW: which zone owns this route
+    zone = models.ForeignKey(
+        Zone,
+        on_delete=models.CASCADE,
+        related_name="routes",
+        null=True,
+        blank=True,
+        help_text="Operational zone that manages this route"
+    )
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         verbose_name = 'Route'
         verbose_name_plural = 'Routes'
         ordering = ['number']
-    
+
     def __str__(self):
-        return f"{self.number}: {self.origin} to {self.destination}"
-    
+        # Show zone too (useful for admins)
+        if self.zone:
+            return f"{self.number}: {self.origin} → {self.destination} ({self.zone.name})"
+        return f"{self.number}: {self.origin} → {self.destination}"
+
     def calculate_trips_per_day(self, operational_hours=15):
         """
         Calculate how many round trips a bus can make on this route in a day.
-        
+
         Args:
             operational_hours: Total hours of operation (default 15: 6 AM to 9 PM)
-        
+
         Returns:
             int: Number of possible round trips
         """
         # Total time for one round trip
         total_time_per_trip = (self.duration * 2) + self.turnaround_time + self.buffer_time
-        
+
         # Calculate trips
         trips = operational_hours / float(total_time_per_trip)
-        
+
         return int(trips)
 
 
@@ -120,7 +134,7 @@ class Stop(models.Model):
         default=False,
         help_text="Whether this is a major stop served by limited stop buses"
     )
-    
+
     class Meta:
         verbose_name = 'Stop'
         verbose_name_plural = 'Stops'
@@ -129,6 +143,6 @@ class Stop(models.Model):
             ['route', 'sequence'],  # Ensure unique sequence per route
             ['route', 'name'],      # Ensure unique stop name per route
         ]
-    
+
     def __str__(self):
         return f"{self.sequence}. {self.name} (Route {self.route.number})"

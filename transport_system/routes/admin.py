@@ -8,7 +8,7 @@ from .models import Route, Stop
 
 class StopInline(admin.TabularInline):
     """
-    Inline admin for stops within route admin
+    Inline admin for stops inside route admin
     """
     model = Stop
     extra = 1
@@ -21,37 +21,47 @@ class RouteAdmin(admin.ModelAdmin):
     """
     Admin configuration for Route model
     """
+
     list_display = (
-        'number', 
-        'name', 
-        'origin', 
-        'destination', 
-        'total_distance', 
+        'number',
+        'name',
+        'origin',
+        'destination',
+        'total_distance',
         'duration',
+        'zone',              # ✅ NEW
         'stop_count'
     )
-    list_filter = ('origin', 'destination', 'created_at')
+
+    list_filter = ('zone', 'origin', 'destination', 'created_at')  # ✅ NEW zone filter
     search_fields = ('number', 'name', 'origin', 'destination')
     readonly_fields = ('created_at', 'updated_at')
-    
+
     fieldsets = (
         ('Basic Information', {
             'fields': ('number', 'name', 'description')
         }),
+
         ('Route Details', {
             'fields': ('origin', 'destination', 'total_distance', 'duration')
         }),
+
+        ('Zone Assignment', {           # ✅ NEW FIELDSET
+            'fields': ('zone',)
+        }),
+
         ('Operational Settings', {
             'fields': ('turnaround_time', 'buffer_time')
         }),
+
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)
         }),
     )
-    
+
     inlines = [StopInline]
-    
+
     def stop_count(self, obj):
         """Display number of stops"""
         return obj.stops.count()
@@ -63,19 +73,21 @@ class StopAdmin(admin.ModelAdmin):
     """
     Admin configuration for Stop model
     """
+
     list_display = (
-        'name', 
-        'route', 
-        'sequence', 
-        'distance_from_origin', 
+        'name',
+        'route',
+        'sequence',
+        'distance_from_origin',
         'is_limited_stop'
     )
+
     list_filter = ('route', 'is_limited_stop')
     search_fields = ('name', 'route__number', 'route__name')
     ordering = ('route', 'sequence')
-    
+
     fieldsets = (
-        ('Basic Information', {
+        ('Basic Info', {
             'fields': ('route', 'name', 'sequence')
         }),
         ('Location Details', {

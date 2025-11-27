@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Zonal Admin Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background: #eef1f7;
+        }
+        .header {
+            background: #004aad;
+            padding: 18px 30px;
+            color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 22px;
+        }
+        .header small {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+        .nav-links a {
+            color: #dbe7ff;
+            text-decoration: none;
+            margin-left: 16px;
+            font-size: 14px;
+        }
+        .nav-links a:hover {
+            text-decoration: underline;
+        }
+        .container {
+            width: 90%;
+            margin: 25px auto 40px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: #ffffff;
+            padding: 18px 20px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            box-shadow: 0px 3px 8px rgba(0,0,0,0.12);
+        }
+        .card h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 18px;
+            color: #222;
+        }
+        .card small {
+            color: #666;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        th {
+            background: #dfe4ea;
+            padding: 10px;
+            text-align: left;
+            font-weight: bold;
+            font-size: 13px;
+        }
+        td {
+            background: #ffffff;
+            padding: 9px 10px;
+            border-bottom: 1px solid #e3e3e3;
+            font-size: 13px;
+        }
+        tr:hover td {
+            background: #f7f9fc;
+        }
+        a.btn {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 7px 12px;
+            border-radius: 6px;
+            text-decoration: none;
+            color: #ffffff;
+            font-size: 13px;
+        }
+        .btn-primary { background: #0275d8; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div>
+        <h1>🚌 Zonal Admin – {{ user.zone.name|default:"All Zones" }}</h1>
+        <small>Logged in as: {{ user.email }} ({{ user.role }})</small>
+    </div>
+    <div class="nav-links">
+        <a href="/zonal-admin/">Dashboard</a>
+        <a href="/zonal-admin/preinforms/">Pre-Informs</a>
+        <a href="/zonal-admin/schedules/">Schedules</a>
+        <a href="/zonal-admin/assign-bus/">Assign Bus</a>
+        <a href="/zonal-admin/demand/">Demand</a>
+        <a href="/zonal-admin/routes/">Routes</a>
+        <a href="/admin/">Django Admin</a>
+    </div>
+</div>
+
+<div class="container">
+
+    <div class="grid">
+
+        <div class="card">
+            <h3>Recent Pre-Informs</h3>
+            <small>Last few pre-informs in your zone</small>
+            <table>
+                <tr>
+                    <th>User</th>
+                    <th>Route</th>
+                    <th>Boarding Stop</th>
+                    <th>Status</th>
+                </tr>
+                {% for p in preinforms %}
+                <tr>
+                    <td>{{ p.user.email }}</td>
+                    <td>{{ p.route.number }} – {{ p.route.name }}</td>
+                    <td>{{ p.boarding_stop.name }}</td>
+                    <td>{{ p.status }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4">No pre-informs yet.</td></tr>
+                {% endfor %}
+            </table>
+            <a href="/zonal-admin/preinforms/" class="btn btn-primary">Manage Pre-Informs</a>
+        </div>
+
+        <div class="card">
+            <h3>Today’s Schedules</h3>
+            <small>Trips scheduled for today</small>
+            <table>
+                <tr>
+                    <th>Bus</th>
+                    <th>Route</th>
+                    <th>Time</th>
+                </tr>
+                {% for s in schedules %}
+                <tr>
+                    <td>{{ s.bus.number_plate }}</td>
+                    <td>{{ s.route.number }} – {{ s.route.name }}</td>
+                    <td>{{ s.departure_time }} → {{ s.arrival_time }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3">No schedules for today.</td></tr>
+                {% endfor %}
+            </table>
+            <a href="/zonal-admin/schedules/" class="btn btn-primary">View All Schedules</a>
+        </div>
+
+        <div class="card">
+            <h3>Demand Alerts</h3>
+            <small>Latest crowd alerts from stops</small>
+            <table>
+                <tr>
+                    <th>Stop</th>
+                    <th>People</th>
+                    <th>Status</th>
+                </tr>
+                {% for d in demands %}
+                <tr>
+                    <td>{{ d.stop.name }}</td>
+                    <td>{{ d.number_of_people }}</td>
+                    <td>{{ d.status }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3">No demand alerts.</td></tr>
+                {% endfor %}
+            </table>
+            <a href="/zonal-admin/demand/" class="btn btn-primary">Open Demand Page</a>
+        </div>
+
+        <div class="card">
+            <h3>Routes in Zone</h3>
+            <small>Routes controlled by this zone</small>
+            <table>
+                <tr>
+                    <th>No</th>
+                    <th>Origin</th>
+                    <th>Destination</th>
+                </tr>
+                {% for r in routes %}
+                <tr>
+                    <td>{{ r.number }}</td>
+                    <td>{{ r.origin }}</td>
+                    <td>{{ r.destination }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3">No routes assigned.</td></tr>
+                {% endfor %}
+            </table>
+            <a href="/zonal-admin/routes/" class="btn btn-primary">View All Routes</a>
+        </div>
+
+    </div>
+
+</div>
+
+</body>
+</html>

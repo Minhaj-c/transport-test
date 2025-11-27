@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Schedules</title>
+    <style>
+        body { font-family:Arial, sans-serif; margin:0; background:#eef1f7; }
+        .header {
+            background:#004aad; padding:18px 30px; color:white;
+            display:flex; justify-content:space-between; align-items:center;
+            box-shadow:0 2px 5px rgba(0,0,0,0.2);
+        }
+        .header h2 { margin:0; }
+        .header a { color:#dbe7ff; text-decoration:none; margin-left:16px; font-size:14px; }
+        .container { width:90%; margin:25px auto 40px; }
+        .card {
+            background:#ffffff; padding:18px 20px; border-radius:10px;
+            box-shadow:0px 3px 8px rgba(0,0,0,0.12);
+        }
+        table { width:100%; border-collapse:collapse; margin-top:10px; border-radius:8px; overflow:hidden; }
+        th { background:#dfe4ea; padding:10px; text-align:left; font-size:13px; }
+        td { padding:9px 10px; border-bottom:1px solid #e3e3e3; font-size:13px; background:#fff; }
+        tr:hover td { background:#f7f9fc; }
+        .btn-primary {
+            display:inline-block; padding:8px 14px; border-radius:6px;
+            text-decoration:none; background:#0275d8; color:white; font-size:13px;
+            margin-bottom:10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h2>Schedules – {{ user.zone.name|default:"All Zones" }}</h2>
+    <div>
+        <a href="/zonal-admin/">Dashboard</a>
+        <a href="/zonal-admin/preinforms/">Pre-Informs</a>
+        <a href="/zonal-admin/routes/">Routes</a>
+    </div>
+</div>
+
+<div class="container">
+    <div class="card">
+        <a href="/zonal-admin/assign-bus/" class="btn-primary">Assign New Bus</a>
+
+        <table>
+            <tr>
+                <th>Bus</th>
+                <th>Route</th>
+                <th>Date</th>
+                <th>Departure</th>
+                <th>Arrival</th>
+            </tr>
+
+            {% for s in schedules %}
+            <tr>
+                <td>{{ s.bus.number_plate }}</td>
+                <td>{{ s.route.number }} – {{ s.route.name }}</td>
+                <td>{{ s.date }}</td>
+                <td>{{ s.departure_time }}</td>
+                <td>{{ s.arrival_time }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5">No schedules defined.</td></tr>
+            {% endfor %}
+        </table>
+    </div>
+</div>
+
+</body>
+</html>

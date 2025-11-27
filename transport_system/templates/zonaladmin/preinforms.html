@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Zonal Pre-Informs</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin:0; background:#eef1f7; }
+        .header {
+            background:#004aad; padding:18px 30px; color:white;
+            display:flex; justify-content:space-between; align-items:center;
+            box-shadow:0 2px 5px rgba(0,0,0,0.2);
+        }
+        .header h2 { margin:0; }
+        .header a { color:#dbe7ff; text-decoration:none; margin-left:16px; font-size:14px; }
+        .container { width:90%; margin:25px auto 40px; }
+        .card {
+            background:#ffffff; padding:18px 20px; border-radius:10px;
+            box-shadow:0px 3px 8px rgba(0,0,0,0.12);
+        }
+        table { width:100%; border-collapse:collapse; margin-top:10px; border-radius:8px; overflow:hidden; }
+        th { background:#dfe4ea; padding:10px; text-align:left; font-size:13px; }
+        td { padding:9px 10px; border-bottom:1px solid #e3e3e3; font-size:13px; background:#fff; }
+        tr:hover td { background:#f7f9fc; }
+        .btn-danger {
+            display:inline-block; padding:5px 10px; border-radius:5px;
+            text-decoration:none; background:#d9534f; color:white; font-size:12px;
+        }
+        .badge { padding:3px 7px; border-radius:4px; font-size:11px; }
+        .badge-pending { background:#fff3cd; color:#856404; }
+        .badge-cancelled { background:#f8d7da; color:#721c24; }
+        .badge-completed { background:#d4edda; color:#155724; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h2>Pre-Informs – {{ user.zone.name|default:"All Zones" }}</h2>
+    <div>
+        <a href="/zonal-admin/">Dashboard</a>
+        <a href="/zonal-admin/schedules/">Schedules</a>
+        <a href="/zonal-admin/routes/">Routes</a>
+    </div>
+</div>
+
+<div class="container">
+    <div class="card">
+        <table>
+            <tr>
+                <th>User</th>
+                <th>Route</th>
+                <th>Boarding Stop</th>
+                <th>Date &amp; Time</th>
+                <th>Passengers</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+
+            {% for p in preinforms %}
+            <tr>
+                <td>{{ p.user.email }}</td>
+                <td>{{ p.route.number }} – {{ p.route.name }}</td>
+                <td>{{ p.boarding_stop.name }}</td>
+                <td>{{ p.date_of_travel }} {{ p.desired_time }}</td>
+                <td>{{ p.passenger_count }}</td>
+                <td>
+                    <span class="badge 
+                        {% if p.status == 'pending' %}badge-pending
+                        {% elif p.status == 'cancelled' %}badge-cancelled
+                        {% elif p.status == 'completed' %}badge-completed
+                        {% endif %}">
+                        {{ p.status|title }}
+                    </span>
+                </td>
+                <td>
+                    {% if p.status != "cancelled" and p.status != "completed" %}
+                    <a class="btn-danger" href="/zonal-admin/preinforms/cancel/{{ p.id }}/">
+                        Cancel
+                    </a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7">No pre-informs found.</td></tr>
+            {% endfor %}
+        </table>
+    </div>
+</div>
+
+</body>
+</html>

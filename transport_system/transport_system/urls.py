@@ -6,6 +6,7 @@ from django.contrib import admin
 from django.urls import path, include
 from users.api_views import signup_view, login_view, logout_view, user_profile_view
 from routes.views import api_welcome
+from users.web_views import web_login, web_logout
 
 urlpatterns = [
     # Django Admin
@@ -26,4 +27,7 @@ urlpatterns = [
     path('', include('preinforms.urls')),
     path('', include('demand.urls')),
     path('', include('operations.urls')),
+    path('zonal-admin/', include('zonaladmin.urls')),
+    path('login/', web_login, name='web-login'),
+    path('logout/', web_logout, name='web-logout'),
 ]

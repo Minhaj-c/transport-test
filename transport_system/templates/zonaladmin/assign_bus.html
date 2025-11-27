@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Assign Bus</title>
+    <style>
+        body { font-family:Arial, sans-serif; margin:0; background:#eef1f7; }
+        .header {
+            background:#004aad; padding:18px 30px; color:white;
+            display:flex; justify-content:space-between; align-items:center;
+            box-shadow:0 2px 5px rgba(0,0,0,0.2);
+        }
+        .header h2 { margin:0; }
+        .header a { color:#dbe7ff; text-decoration:none; margin-left:16px; font-size:14px; }
+        .container { width:90%; margin:25px auto 40px; }
+        .card {
+            background:#ffffff; padding:22px 24px; border-radius:10px;
+            box-shadow:0px 3px 8px rgba(0,0,0,0.12);
+            max-width:600px;
+        }
+        label { display:block; font-weight:bold; margin-top:10px; font-size:14px; }
+        select, input {
+            padding:9px 10px;
+            width:100%;
+            margin-top:6px;
+            border-radius:6px;
+            border:1px solid #c4c4c4;
+            font-size:14px;
+        }
+        button.btn-primary {
+            margin-top:16px;
+            padding:9px 16px;
+            border-radius:6px;
+            border:none;
+            background:#0275d8;
+            color:white;
+            font-size:14px;
+            cursor:pointer;
+        }
+        button.btn-primary:hover { opacity:0.9; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h2>Assign Bus – {{ user.zone.name|default:"All Zones" }}</h2>
+    <div>
+        <a href="/zonal-admin/schedules/">Back to Schedules</a>
+        <a href="/zonal-admin/">Dashboard</a>
+    </div>
+</div>
+
+<div class="container">
+    <div class="card">
+        <form method="POST">
+            {% csrf_token %}
+
+            <label>Route</label>
+            <select name="route" required>
+                <option value="">Select Route</option>
+                {% for r in routes %}
+                <option value="{{ r.id }}">{{ r.number }} – {{ r.name }}</option>
+                {% endfor %}
+            </select>
+
+            <label>Bus</label>
+            <select name="bus" required>
+                <option value="">Select Bus</option>
+                {% for b in buses %}
+                <option value="{{ b.id }}">{{ b.number_plate }} – {{ b.model }}</option>
+                {% endfor %}
+            </select>
+
+            <label>Driver</label>
+            <select name="driver" required>
+                <option value="">Select Driver</option>
+                {% for d in drivers %}
+                <option value="{{ d.id }}">
+                    {{ d.get_full_name }} ({{ d.email }})
+                </option>
+                {% endfor %}
+            </select>
+
+            <label>Date</label>
+            <input type="date" name="date" required>
+
+            <label>Departure Time</label>
+            <input type="time" name="departure_time" required>
+
+            <label>Arrival Time</label>
+            <input type="time" name="arrival_time" required>
+
+            <button type="submit" class="btn-primary">Create Schedule</button>
+        </form>
+    </div>
+</div>
+
+</body>
+</html>
