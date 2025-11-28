@@ -12,6 +12,9 @@ from schedules.models import Schedule, Bus
 from routes.models import Route
 from demand.models import DemandAlert
 
+# 🔹 Our alert engine (auto alerts from NOTED pre-informs)
+from zonaladmin.logic.alert_engine import generate_demand_alerts
+
 
 # Helper: get zone-specific queryset
 def filter_zone(queryset, user):
@@ -79,7 +82,7 @@ def zonal_dashboard(request):
         user
     )[:5]
 
-    # Demand alerts in this zone
+    # Demand alerts in this zone (any kind, small preview)
     demands = filter_zone(
         DemandAlert.objects.select_related("stop", "stop__route", "user"),
         user
@@ -175,13 +178,14 @@ def zonal_preinforms(request):
 
 
 # --------------------------
-# 2.1) MARK PREINFORM AS NOTED (NEW)
+# 2.1) MARK PREINFORM AS NOTED
 # --------------------------
 @login_required
 def mark_preinform_noted(request, preinform_id):
     """
     Zonal admin / central admin marks a PreInform as 'noted'.
-    This is still NOT a booking; just "we saw this demand".
+    This is still NOT a booking; just 'we saw this demand'.
+    Also triggers demand alert generation for that zone + date.
     """
     user = request.user
 
@@ -203,6 +207,11 @@ def mark_preinform_noted(request, preinform_id):
     if preinform.status in ["pending", "noted"]:
         preinform.status = "noted"
         preinform.save()
+
+        # 🔥 Generate / update demand alerts from NOTED pre-informs
+        # for this zone and this travel date.
+        if getattr(user, "zone_id", None):
+            generate_demand_alerts(zone=user.zone, for_date=preinform.date_of_travel)
 
     return redirect("zonal-preinforms")
 
@@ -322,10 +331,19 @@ def assign_bus_view(request):
 @login_required
 def zonal_demand_alerts(request):
     user = request.user
+
+    # For now we don't auto-generate here; alerts are generated when
+    # pre-informs are marked as NOTED. We just display them.
+
+    # Show only alerts for this zonal admin's zone
+    # AND only system-generated ones (from pre-informs).
     alerts = filter_zone(
         DemandAlert.objects.select_related("stop", "stop__route", "user"),
         user
+    ).filter(
+        user__isnull=True  # 🔥 system (pre-informs), not passenger reports
     ).order_by("-created_at")
+
     return render(request, "zonaladmin/demand.html", {"alerts": alerts})
 
 

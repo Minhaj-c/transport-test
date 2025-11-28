@@ -1,40 +1,290 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Demand Alerts</title>
+    <meta charset="UTF-8">
+    <title>Demand Alerts – Zonal Admin</title>
     <style>
-        body{ font-family:Arial; background:#f3f6fc; }
-        .container{ width:95%; margin:auto; padding:20px; }
-        .header{ background:#004aad; padding:15px; color:white; }
-        table{ width:100%; border-collapse:collapse; margin-top:15px; }
-        th,td{ padding:10px; border-bottom:1px solid #ddd; }
-        th{ background:#e8e8e8; }
+        :root {
+            --bg-page: #f3f4f6;
+            --bg-header: #ffffff;
+            --bg-card: #ffffff;
+            --border-soft: #e5e7eb;
+            --text-main: #111827;
+            --text-muted: #6b7280;
+
+            --accent: #2563eb; /* soft blue */
+            --accent-soft: #eff6ff;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 0;
+            background: var(--bg-page);
+            color: var(--text-main);
+        }
+
+        /* HEADER */
+        .header {
+            background: var(--bg-header);
+            border-bottom: 1px solid var(--border-soft);
+            padding: 14px 28px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left h2 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .header-left small {
+            display: block;
+            margin-top: 4px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .header-nav a {
+            color: #374151;
+            text-decoration: none;
+            margin-left: 12px;
+            font-size: 13px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid transparent;
+        }
+
+        .header-nav a:hover {
+            border-color: var(--border-soft);
+            background: #f9fafb;
+        }
+
+        /* PAGE LAYOUT */
+        .page {
+            width: 96%;
+            max-width: 1100px;
+            margin: 20px auto 32px;
+        }
+
+        .section-title {
+            margin: 0 0 4px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .section-subtitle {
+            margin: 0 0 10px;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .legend {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+
+        .legend span {
+            margin-right: 8px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: 8px;
+            border: 1px solid var(--border-soft);
+            padding: 10px 10px;
+            box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+            overflow-x: auto;
+        }
+
+        /* TABLE */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        th, td {
+            padding: 7px 6px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+            white-space: nowrap;
+        }
+
+        th {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+            color: #6b7280;
+            background: #f9fafb;
+        }
+
+        tr:nth-child(even) td {
+            background: #f9fafb;
+        }
+
+        /* BADGES */
+        .badge {
+            display: inline-block;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-weight: 500;
+        }
+
+        .badge-level-normal {
+            background: #e5e7eb;
+            color: #374151;
+        }
+        .badge-level-medium {
+            background: #fef9c3;
+            color: #854d0e;
+        }
+        .badge-level-high {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+        .badge-level-critical {
+            background: #991b1b;
+            color: #fee2e2;
+        }
+
+        .badge-status-reported {
+            background: #e0f2fe;
+            color: #075985;
+        }
+        .badge-status-verified {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .badge-status-dispatched {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .badge-status-resolved {
+            background: #e5e7eb;
+            color: #4b5563;
+        }
+        .badge-status-expired {
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+
+        .muted {
+            color: var(--text-muted);
+            font-size: 11px;
+        }
     </style>
 </head>
 <body>
 
 <div class="header">
-    <h2>Demand Alerts – {{ user.zone }}</h2>
+    <div class="header-left">
+        <h2>
+            Demand Alerts
+            {% if user.zone %}
+                – {{ user.zone.name }}
+            {% endif %}
+        </h2>
+        <small>
+            Auto-generated from <strong>NOTED</strong> pre-informs. Levels: Normal / Medium / High / Critical.
+        </small>
+    </div>
+    <div class="header-nav">
+        <a href="/zonal-admin/">Dashboard</a>
+        <a href="/zonal-admin/preinforms/">Pre-Informs</a>
+        <a href="/zonal-admin/schedules/">Schedules</a>
+    </div>
 </div>
 
-<div class="container">
-    <table>
-        <tr>
-            <th>Stop</th>
-            <th>Level</th>
-            <th>Status</th>
-            <th>Time</th>
-        </tr>
+<div class="page">
+    <h3 class="section-title">Live Demand Alerts</h3>
+    <p class="section-subtitle">
+        These alerts are created from passengers' pre-informs that you marked as <strong>Noted</strong>.
+    </p>
 
-        {% for d in alerts %}
-        <tr>
-            <td>{{ d.stop.name }}</td>
-            <td>{{ d.level }}</td>
-            <td>{{ d.status }}</td>
-            <td>{{ d.created_at }}</td>
-        </tr>
-        {% endfor %}
-    </table>
+    <div class="legend">
+        <span><span class="badge badge-level-normal">Normal</span> 0–9 people</span>
+        <span><span class="badge badge-level-medium">Medium</span> 10–19 people</span>
+        <span><span class="badge badge-level-high">High</span> 20–49 people</span>
+        <span><span class="badge badge-level-critical">Critical</span> 50+ people</span>
+    </div>
+
+    <div class="card">
+        <table>
+            <thead>
+            <tr>
+                <th>#</th>
+                <th>Stop</th>
+                <th>Route</th>
+                <th>People</th>
+                <th>Level</th>
+                <th>Status</th>
+                <th>Source</th>
+                <th>Created</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% if alerts %}
+                {% for alert in alerts %}
+                    {% with level=alert.get_level %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ alert.stop.name }}</td>
+                        <td>
+                            {% if alert.stop.route %}
+                                {{ alert.stop.route.number }} – {{ alert.stop.route.name }}
+                            {% else %}
+                                <span class="muted">No route linked</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ alert.number_of_people }}</td>
+                        <td>
+                            <span class="badge
+                                {% if level == 'normal' %}badge-level-normal{% endif %}
+                                {% if level == 'medium' %}badge-level-medium{% endif %}
+                                {% if level == 'high' %}badge-level-high{% endif %}
+                                {% if level == 'critical' %}badge-level-critical{% endif %}
+                            ">
+                                {{ level|title }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge
+                                {% if alert.status == 'reported' %}badge-status-reported{% endif %}
+                                {% if alert.status == 'verified' %}badge-status-verified{% endif %}
+                                {% if alert.status == 'dispatched' %}badge-status-dispatched{% endif %}
+                                {% if alert.status == 'resolved' %}badge-status-resolved{% endif %}
+                                {% if alert.status == 'expired' %}badge-status-expired{% endif %}
+                            ">
+                                {{ alert.get_status_display }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if alert.user %}
+                                {{ alert.user.email }}
+                            {% else %}
+                                <span class="muted">System (Pre-Informs)</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ alert.created_at|date:"Y-m-d H:i" }}</td>
+                    </tr>
+                    {% endwith %}
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="8" class="muted">No demand alerts yet for your zone.</td>
+                </tr>
+            {% endif %}
+            </tbody>
+        </table>
+    </div>
 </div>
 
 </body>
