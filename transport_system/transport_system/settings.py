@@ -185,3 +185,4 @@ REST_FRAMEWORK = {
 
 TICKET_PRICE_PER_KM = 10  # ₹10 per kilometer
 FUEL_PRICE_PER_LITER = 80
+#km
