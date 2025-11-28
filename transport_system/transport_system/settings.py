@@ -186,3 +186,12 @@ REST_FRAMEWORK = {
 TICKET_PRICE_PER_KM = 10  # ₹10 per kilometer
 FUEL_PRICE_PER_LITER = 80
 #km
+
+# Where Django should send unauthenticated users
+LOGIN_URL = "/login/"
+
+# Where to go after successful login
+LOGIN_REDIRECT_URL = "/zonal-admin/"
+
+# Where to go after logout
+LOGOUT_REDIRECT_URL = "/login/"
