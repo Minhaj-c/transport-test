@@ -6,6 +6,7 @@ urlpatterns = [
 
     # Preinforms
     path('preinforms/', views.zonal_preinforms, name='zonal-preinforms'),
+    path('preinforms/noted/<int:preinform_id>/', views.mark_preinform_noted, name='mark-preinform-noted'),
     path('preinforms/cancel/<int:preinform_id>/', views.cancel_preinform, name='cancel-preinform'),
 
     # Schedules

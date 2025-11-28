@@ -1,88 +1,438 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Zonal Pre-Informs</title>
     <style>
-        body { font-family: Arial, sans-serif; margin:0; background:#eef1f7; }
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 0;
+            background: #eef1f7;
+        }
         .header {
-            background:#004aad; padding:18px 30px; color:white;
-            display:flex; justify-content:space-between; align-items:center;
-            box-shadow:0 2px 5px rgba(0,0,0,0.2);
+            background: #004aad;
+            color: white;
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
         }
-        .header h2 { margin:0; }
-        .header a { color:#dbe7ff; text-decoration:none; margin-left:16px; font-size:14px; }
-        .container { width:90%; margin:25px auto 40px; }
-        .card {
-            background:#ffffff; padding:18px 20px; border-radius:10px;
-            box-shadow:0px 3px 8px rgba(0,0,0,0.12);
+        .header h2 {
+            margin: 0;
+            font-size: 20px;
         }
-        table { width:100%; border-collapse:collapse; margin-top:10px; border-radius:8px; overflow:hidden; }
-        th { background:#dfe4ea; padding:10px; text-align:left; font-size:13px; }
-        td { padding:9px 10px; border-bottom:1px solid #e3e3e3; font-size:13px; background:#fff; }
-        tr:hover td { background:#f7f9fc; }
+        .header small {
+            opacity: 0.9;
+            font-size: 13px;
+        }
+        .header-nav a {
+            color: #dbe7ff;
+            text-decoration: none;
+            margin-left: 16px;
+            font-size: 13px;
+        }
+        .header-nav a:hover {
+            text-decoration: underline;
+        }
+
+        .container {
+            width: 94%;
+            max-width: 1200px;
+            margin: 24px auto 40px;
+        }
+
+        .filters {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .filters form {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .filters label {
+            font-size: 13px;
+            color: #555;
+        }
+        .filters input[type="date"] {
+            padding: 6px 8px;
+            border-radius: 6px;
+            border: 1px solid #cfd4e3;
+            font-size: 13px;
+        }
+        .btn {
+            padding: 7px 14px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .btn-primary {
+            background: #006fee;
+            color: white;
+        }
+        .btn-primary:hover {
+            opacity: 0.9;
+        }
         .btn-danger {
-            display:inline-block; padding:5px 10px; border-radius:5px;
-            text-decoration:none; background:#d9534f; color:white; font-size:12px;
+            background: #e11d48;
+            color: white;
         }
-        .badge { padding:3px 7px; border-radius:4px; font-size:11px; }
-        .badge-pending { background:#fff3cd; color:#856404; }
-        .badge-cancelled { background:#f8d7da; color:#721c24; }
-        .badge-completed { background:#d4edda; color:#155724; }
+        .btn-danger:hover {
+            opacity: 0.9;
+        }
+        .btn-outline {
+            background: white;
+            border: 1px solid #cfd4e3;
+            color: #333;
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+        .kpi-card {
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 14px 16px;
+            box-shadow: 0 2px 6px rgba(15,23,42,0.08);
+        }
+        .kpi-label {
+            font-size: 12px;
+            color: #6b7280;
+        }
+        .kpi-value {
+            font-size: 22px;
+            font-weight: 600;
+            margin-top: 6px;
+            color: #111827;
+        }
+        .kpi-sub {
+            font-size: 11px;
+            color: #9ca3af;
+            margin-top: 4px;
+        }
+
+        .section-title {
+            margin: 18px 0 8px;
+            font-size: 15px;
+            font-weight: 600;
+            color: #111827;
+        }
+        .section-subtitle {
+            font-size: 12px;
+            color: #6b7280;
+            margin-bottom: 6px;
+        }
+
+        .two-col {
+            display: grid;
+            grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .card {
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 12px 14px;
+            box-shadow: 0 1px 4px rgba(15,23,42,0.08);
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        th, td {
+            padding: 7px 6px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+            white-space: nowrap;
+        }
+        th {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+            color: #6b7280;
+            background: #f9fafb;
+        }
+        tr:nth-child(even) td {
+            background: #fafafa;
+        }
+
+        .badge {
+            display: inline-block;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 999px;
+        }
+        .badge-pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .badge-noted {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+        .badge-completed {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .badge-cancelled {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+
+        .pill {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 999px;
+            background: #eff6ff;
+            color: #1d4ed8;
+            font-size: 11px;
+        }
+
+        .muted {
+            color: #6b7280;
+            font-size: 11px;
+        }
     </style>
 </head>
 <body>
 
 <div class="header">
-    <h2>Pre-Informs – {{ user.zone.name|default:"All Zones" }}</h2>
     <div>
+        <h2>
+            Pre-Informs Analytics
+            {% if user.zone %}
+                – {{ user.zone.name }}
+            {% else %}
+                – All Zones
+            {% endif %}
+        </h2>
+        <small>
+            Date: {{ selected_date }} &nbsp;·&nbsp;
+            Pure demand forecasting – no booking / no seat reservation
+        </small>
+    </div>
+    <div class="header-nav">
         <a href="/zonal-admin/">Dashboard</a>
         <a href="/zonal-admin/schedules/">Schedules</a>
-        <a href="/zonal-admin/routes/">Routes</a>
+        <a href="/zonal-admin/demand/">Demand Alerts</a>
     </div>
 </div>
 
 <div class="container">
+
+    <!-- Filters -->
+    <div class="filters">
+        <form method="get">
+            <label for="date">Select date:</label>
+            <input type="date" id="date" name="date"
+                   value="{{ selected_date|date:'Y-m-d' }}">
+            <button type="submit" class="btn btn-primary">Apply</button>
+            <a href="/zonal-admin/preinforms/" class="btn btn-outline">Today</a>
+        </form>
+        <div class="muted">
+            Total records: {{ summary.total_preinforms }} &nbsp;·&nbsp;
+            Total passengers: {{ summary.total_passengers }}
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-label">Total Expected Passengers</div>
+            <div class="kpi-value">{{ summary.total_passengers }}</div>
+            <div class="kpi-sub">Sum of passenger_count for selected date</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Pre-Inform Submissions</div>
+            <div class="kpi-value">{{ summary.total_preinforms }}</div>
+            <div class="kpi-sub">Number of users who informed plans</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Active Routes</div>
+            <div class="kpi-value">{{ summary.unique_routes }}</div>
+            <div class="kpi-sub">Routes with at least 1 pre-inform</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Boarding Stops</div>
+            <div class="kpi-value">{{ summary.unique_stops }}</div>
+            <div class="kpi-sub">Unique stops used as boarding point</div>
+        </div>
+    </div>
+
+    <!-- Grouped Analytics -->
+    <h3 class="section-title">Demand Overview</h3>
+    <div class="section-subtitle">
+        Use this to decide where extra / spare buses should be deployed.
+    </div>
+
+    <div class="two-col">
+        <!-- By Route -->
+        <div class="card">
+            <div class="section-subtitle" style="margin-bottom:8px;">
+                By Route (sorted by total passengers)
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Route</th>
+                        <th>Passengers</th>
+                        <th>Pre-Informs</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if route_stats %}
+                        {% for r in route_stats %}
+                        <tr>
+                            <td>
+                                <strong>{{ r.route__number }}</strong> – {{ r.route__name }}
+                            </td>
+                            <td>{{ r.total_passengers }}</td>
+                            <td>{{ r.total_preinforms }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="3" class="muted">No data for this date.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- By Stop + Time -->
+        <div class="card">
+            <div class="section-subtitle" style="margin-bottom:8px;">
+                By Stop &amp; Time (good for spare bus decisions)
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Stop</th>
+                        <th>Time</th>
+                        <th>Passengers</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if stop_time_stats %}
+                        {% for s in stop_time_stats %}
+                        <tr>
+                            <td>{{ s.boarding_stop__name }}</td>
+                            <td>{{ s.desired_time|time:"H:i" }}</td>
+                            <td>{{ s.total_passengers }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="3" class="muted">No data for this date.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Detailed List -->
+    <h3 class="section-title">Detailed Pre-Inform List</h3>
+    <div class="section-subtitle">
+        This is only for internal planning. Passengers are <strong>not</strong> booking seats here.
+    </div>
+
     <div class="card">
         <table>
-            <tr>
-                <th>User</th>
-                <th>Route</th>
-                <th>Boarding Stop</th>
-                <th>Date &amp; Time</th>
-                <th>Passengers</th>
-                <th>Status</th>
-                <th>Action</th>
-            </tr>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Passenger</th>
+                    <th>Route</th>
+                    <th>Boarding Stop</th>
+                    <th>Count</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if preinforms %}
+                    {% for p in preinforms %}
+                    <tr>
+                        <td>{{ p.desired_time|time:"H:i" }}</td>
+                        <td>
+                            {{ p.user.get_full_name|default:p.user.email }}
+                            <div class="muted">{{ p.user.email }}</div>
+                        </td>
+                        <td>
+                            <span class="pill">
+                                {{ p.route.number }} – {{ p.route.name }}
+                            </span>
+                        </td>
+                        <td>{{ p.boarding_stop.name }}</td>
+                        <td>{{ p.passenger_count }}</td>
+                        <td>
+                            {% if p.status == "pending" %}
+                                <span class="badge badge-pending">Pending</span>
+                            {% elif p.status == "noted" %}
+                                <span class="badge badge-noted">Noted</span>
+                            {% elif p.status == "completed" %}
+                                <span class="badge badge-completed">Completed</span>
+                            {% elif p.status == "cancelled" %}
+                                <span class="badge badge-cancelled">Cancelled</span>
+                            {% else %}
+                                <span class="badge">{{ p.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ p.created_at|date:"Y-m-d H:i" }}</td>
+                        <td>
+                            {% if p.status == "pending" or p.status == "noted" %}
+                                <!-- Mark as Noted -->
+                                <form method="post"
+                                      action="{% url 'mark-preinform-noted' p.id %}"
+                                      style="display:inline;">
+                                    {% csrf_token %}
+                                    <button type="submit"
+                                            class="btn btn-primary"
+                                            {% if p.status == "noted" %}disabled{% endif %}>
+                                        {% if p.status == "noted" %}
+                                            Noted
+                                        {% else %}
+                                            Mark Noted
+                                        {% endif %}
+                                    </button>
+                                </form>
 
-            {% for p in preinforms %}
-            <tr>
-                <td>{{ p.user.email }}</td>
-                <td>{{ p.route.number }} – {{ p.route.name }}</td>
-                <td>{{ p.boarding_stop.name }}</td>
-                <td>{{ p.date_of_travel }} {{ p.desired_time }}</td>
-                <td>{{ p.passenger_count }}</td>
-                <td>
-                    <span class="badge 
-                        {% if p.status == 'pending' %}badge-pending
-                        {% elif p.status == 'cancelled' %}badge-cancelled
-                        {% elif p.status == 'completed' %}badge-completed
-                        {% endif %}">
-                        {{ p.status|title }}
-                    </span>
-                </td>
-                <td>
-                    {% if p.status != "cancelled" and p.status != "completed" %}
-                    <a class="btn-danger" href="/zonal-admin/preinforms/cancel/{{ p.id }}/">
-                        Cancel
-                    </a>
-                    {% endif %}
-                </td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="7">No pre-informs found.</td></tr>
-            {% endfor %}
+                                <!-- Cancel -->
+                                <form method="post"
+                                      action="{% url 'cancel-preinform' p.id %}"
+                                      style="display:inline; margin-left:4px;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-danger">
+                                        Cancel
+                                    </button>
+                                </form>
+                            {% else %}
+                                <span class="muted">No actions</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="8" class="muted">No pre-informs for this date in your zone.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
         </table>
     </div>
+
 </div>
 
 </body>
