@@ -12,16 +12,16 @@ from schedules.models import Schedule, Bus
 from routes.models import Route
 from demand.models import DemandAlert
 
-# 🔹 Our alert engine (auto alerts from NOTED pre-informs)
-from zonaladmin.logic.alert_engine import generate_demand_alerts
-
+# Alert engines
 from zonaladmin.logic.alert_engine import (
-    compute_bus_load_for_schedule,
-    get_overflow_warnings_for_schedule,  # if you added helper
+    generate_demand_alerts,
+    generate_prediction_alerts,
 )
 
 
-# Helper: get zone-specific queryset
+# --------------------------
+# Helper: zone filter
+# --------------------------
 def filter_zone(queryset, user):
     """
     Return zone-filtered queryset for zonal admins, full for superusers/admin.
@@ -73,25 +73,45 @@ def filter_zone(queryset, user):
 @login_required
 def zonal_dashboard(request):
     user = request.user
+    today = timezone.localdate()
 
-    # Pre-informs in this zone (recent 5)
+    # If zonal admin, pass their zone to the engines
+    zone = None
+    if getattr(user, "role", None) == "zonal_admin" and getattr(user, "zone_id", None):
+        zone = user.zone
+
+    # Refresh today's alerts:
+    #  - Pre-inform based
+    #  - Prediction (live bus) based
+    generate_demand_alerts(for_date=today, zone=zone)
+    generate_prediction_alerts(for_date=today, zone=zone)
+
+    # Pre-informs in this zone (recent 5 for today)
     preinforms = filter_zone(
-        PreInform.objects.select_related("route", "boarding_stop", "user"),
-        user
+        PreInform.objects.select_related("route", "boarding_stop", "user")
+        .filter(date_of_travel=today)
+        .order_by("-created_at"),
+        user,
     )[:5]
 
     # Today's schedules in this zone
-    today = timezone.localdate()
     schedules = filter_zone(
         Schedule.objects.filter(date=today).select_related("route", "bus", "driver"),
-        user
+        user,
     )[:5]
 
-    # Demand alerts in this zone (any kind, small preview)
-    demands = filter_zone(
+    # Demand alerts in this zone (today only)
+    demands_qs = filter_zone(
         DemandAlert.objects.select_related("stop", "stop__route", "user"),
-        user
-    )[:5]
+        user,
+    ).filter(created_at__date=today).order_by("-created_at")
+    demands = list(demands_qs[:5])
+
+    # Simple summary counts by intensity (based on people count)
+    high_critical_count = demands_qs.filter(number_of_people__gte=40).count()
+    medium_count = demands_qs.filter(
+        number_of_people__gte=20, number_of_people__lt=40
+    ).count()
 
     # Routes in this zone
     routes = filter_zone(Route.objects.all(), user)[:5]
@@ -102,6 +122,9 @@ def zonal_dashboard(request):
         "schedules": schedules,
         "demands": demands,
         "routes": routes,
+        "today": today,
+        "high_critical_count": high_critical_count,
+        "medium_count": medium_count,
     }
 
     return render(request, "zonaladmin/dashboard.html", context)
@@ -213,8 +236,7 @@ def mark_preinform_noted(request, preinform_id):
         preinform.status = "noted"
         preinform.save()
 
-        # 🔥 Generate / update demand alerts from NOTED pre-informs
-        # for this zone and this travel date.
+        # Generate / update demand alerts from NOTED pre-informs for this zone+date
         if getattr(user, "zone_id", None):
             generate_demand_alerts(zone=user.zone, for_date=preinform.date_of_travel)
 
@@ -262,7 +284,7 @@ def zonal_schedules(request):
     user = request.user
     schedules = filter_zone(
         Schedule.objects.select_related("route", "bus", "driver"),
-        user
+        user,
     ).order_by("date", "departure_time")
 
     return render(request, "zonaladmin/schedules.html", {"schedules": schedules})
@@ -336,33 +358,53 @@ def assign_bus_view(request):
 @login_required
 def zonal_demand_alerts(request):
     user = request.user
-    today = timezone.localdate()
+
+    # --- Date filter (optional, default = today) ---
+    date_str = request.GET.get("date")
+    if date_str:
+        try:
+            selected_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            selected_date = timezone.localdate()
+    else:
+        selected_date = timezone.localdate()
 
     # Determine zone (for zonal admins only)
     zone = None
     if getattr(user, "role", None) == "zonal_admin" and getattr(user, "zone_id", None):
         zone = user.zone
 
-    # 1) Classical demand from NOTED pre-informs
+    # Import here to avoid circular imports
     from zonaladmin.logic.alert_engine import (
         generate_demand_alerts,
         generate_prediction_alerts,
     )
 
-    generate_demand_alerts(for_date=today, zone=zone)
+    # 1) Classical demand from NOTED pre-informs
+    generate_demand_alerts(for_date=selected_date, zone=zone)
 
     # 2) Prediction-based alerts using running buses + preinforms
-    generate_prediction_alerts(for_date=today, zone=zone)
+    generate_prediction_alerts(for_date=selected_date, zone=zone)
 
-    # 3) Show combined alerts (filtered by zone via helper)
-    alerts = filter_zone(
-        DemandAlert.objects.select_related("stop", "stop__route", "user"),
-        user,
-    ).order_by("-created_at")
+    # 3) Load alerts only for this date (+ zone via filter_zone)
+    base_qs = DemandAlert.objects.select_related("stop", "stop__route", "user") \
+        .filter(created_at__date=selected_date) \
+        .order_by("-created_at")
 
-    return render(request, "zonaladmin/demand.html", {"alerts": alerts})
+    base_qs = filter_zone(base_qs, user)
 
+    # Split into two groups using text we set in admin_notes
+    preinform_alerts = base_qs.filter(admin_notes__icontains="Pre-Informs")
+    prediction_alerts = base_qs.filter(admin_notes__icontains="Prediction (Bus load)")
 
+    context = {
+        "user": user,
+        "selected_date": selected_date,
+        "preinform_alerts": preinform_alerts,
+        "prediction_alerts": prediction_alerts,
+    }
+
+    return render(request, "zonaladmin/demand.html", context)
 
 # --------------------------
 # 7) ROUTES PAGE
@@ -372,7 +414,7 @@ def zonal_routes(request):
     user = request.user
     routes = filter_zone(
         Route.objects.all().select_related("zone"),
-        user
+        user,
     ).order_by("number")
 
     return render(request, "zonaladmin/routes.html", {"routes": routes})
@@ -386,7 +428,7 @@ def schedule_load_prediction(request, schedule_id):
     """
     Show bus load prediction for a single schedule:
     - combines current_passengers (driver app)
-    - with NOTED + PENDING pre-informs for that route+date
+    - with NOTED pre-informs for that route+date
     - shows where bus will exceed capacity
     """
     user = request.user
@@ -402,14 +444,13 @@ def schedule_load_prediction(request, schedule_id):
         if schedule.route.zone_id != getattr(user, "zone_id", None):
             return redirect("zonal-schedules")
 
-    # Use our prediction logic
+    # Use our prediction logic from alert_engine
+    from zonaladmin.logic.alert_engine import compute_bus_load_for_schedule
+
     try:
-        # If you added helper:
-        data = get_overflow_warnings_for_schedule(schedule)
-        # Or, if you don't want helper:
-        # data = compute_bus_load_for_schedule(schedule)
+        data = compute_bus_load_for_schedule(schedule)
     except Exception as exc:
-        # Basic safety: if prediction crashes, show a friendly error
+        # If anything goes wrong, show friendly error
         return render(
             request,
             "zonaladmin/schedule_load.html",

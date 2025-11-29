@@ -16,9 +16,7 @@
             --accent-soft: #eff6ff;
         }
 
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
 
         body {
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -101,6 +99,7 @@
             padding: 10px 10px;
             box-shadow: 0 1px 2px rgba(15,23,42,0.04);
             overflow-x: auto;
+            margin-bottom: 20px;
         }
 
         /* TABLE */
@@ -180,6 +179,59 @@
             color: var(--text-muted);
             font-size: 11px;
         }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: var(--accent-soft);
+            font-size: 11px;
+            color: #1d4ed8;
+        }
+
+        .pill-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 999px;
+            background: #1d4ed8;
+        }
+
+        .top-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .date-form {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+
+        .date-form input[type="date"] {
+            font-size: 12px;
+            padding: 4px 6px;
+            border-radius: 6px;
+            border: 1px solid var(--border-soft);
+        }
+
+        .date-form button {
+            border: none;
+            border-radius: 999px;
+            padding: 5px 12px;
+            font-size: 12px;
+            background: var(--accent);
+            color: white;
+            cursor: pointer;
+        }
+
+        .date-form button:hover {
+            background: #1d4ed8;
+        }
     </style>
 </head>
 <body>
@@ -193,7 +245,7 @@
             {% endif %}
         </h2>
         <small>
-            Auto-generated from <strong>NOTED</strong> pre-informs. Levels: Normal / Medium / High / Critical.
+            Auto-generated from <strong>NOTED</strong> pre-informs and live bus load predictions.
         </small>
     </div>
     <div class="header-nav">
@@ -204,10 +256,28 @@
 </div>
 
 <div class="page">
-    <h3 class="section-title">Live Demand Alerts</h3>
-    <p class="section-subtitle">
-        These alerts are created from passengers' pre-informs that you marked as <strong>Noted</strong>.
-    </p>
+    <div class="top-row">
+        <div>
+            <h3 class="section-title">Live Demand Alerts</h3>
+            <p class="section-subtitle">
+                Showing alerts for
+                <strong>{{ selected_date|date:"Y-m-d" }}</strong>.
+                Alerts may come from <strong>NOTED pre-informs</strong> or
+                <strong>prediction (running buses)</strong>.
+            </p>
+        </div>
+
+        <form method="get" class="date-form">
+            <label for="date">Date:</label>
+            <input
+                id="date"
+                type="date"
+                name="date"
+                value="{{ selected_date|date:'Y-m-d' }}"
+            >
+            <button type="submit">Apply</button>
+        </form>
+    </div>
 
     <div class="legend">
         <span><span class="badge badge-level-normal">Normal</span> 0–9 people</span>
@@ -216,7 +286,18 @@
         <span><span class="badge badge-level-critical">Critical</span> 50+ people</span>
     </div>
 
+    <!-- =======================
+         SECTION 1: PRE-INFORM DEMAND
+         ======================= -->
     <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <div class="pill">
+                <span class="pill-dot"></span>
+                Stop demand from NOTED pre-informs
+            </div>
+            <span class="muted">People = passengers who will <strong>board at that stop</strong></span>
+        </div>
+
         <table>
             <thead>
             <tr>
@@ -231,8 +312,8 @@
             </tr>
             </thead>
             <tbody>
-            {% if alerts %}
-                {% for alert in alerts %}
+            {% if preinform_alerts %}
+                {% for alert in preinform_alerts %}
                     {% with level=alert.get_level %}
                     <tr>
                         <td>{{ forloop.counter }}</td>
@@ -267,11 +348,7 @@
                             </span>
                         </td>
                         <td>
-                            {% if alert.user %}
-                                {{ alert.user.email }}
-                            {% else %}
-                                <span class="muted">System (Pre-Informs)</span>
-                            {% endif %}
+                            <span class="muted">System (Pre-Informs)</span>
                         </td>
                         <td>{{ alert.created_at|date:"Y-m-d H:i" }}</td>
                     </tr>
@@ -279,7 +356,80 @@
                 {% endfor %}
             {% else %}
                 <tr>
-                    <td colspan="8" class="muted">No demand alerts yet for your zone.</td>
+                    <td colspan="8" class="muted">No pre-inform based demand alerts for this date.</td>
+                </tr>
+            {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- =======================
+         SECTION 2: BUS OVERLOAD PREDICTIONS
+         ======================= -->
+    <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <div class="pill" style="background:#fef3c7; color:#92400e;">
+                <span class="pill-dot" style="background:#f97316;"></span>
+                Bus overflow predictions (running buses)
+            </div>
+            <span class="muted">
+                People = passengers expected to be <strong>inside the bus after this stop</strong>.
+            </span>
+        </div>
+
+        <table>
+            <thead>
+            <tr>
+                <th>#</th>
+                <th>Stop</th>
+                <th>Route</th>
+                <th>Expected Load</th>
+                <th>Level</th>
+                <th>Status</th>
+                <th>Source</th>
+                <th>Created</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% if prediction_alerts %}
+                {% for alert in prediction_alerts %}
+                    {% with level=alert.get_level %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ alert.stop.name }}</td>
+                        <td>
+                            {% if alert.stop.route %}
+                                {{ alert.stop.route.number }} – {{ alert.stop.route.name }}
+                            {% else %}
+                                <span class="muted">No route linked</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ alert.number_of_people }}</td>
+                        <td>
+                            <span class="badge
+                                {% if level == 'normal' %}badge-level-normal{% endif %}
+                                {% if level == 'medium' %}badge-level-medium{% endif %}
+                                {% if level == 'high' %}badge-level-high{% endif %}
+                                {% if level == 'critical' %}badge-level-critical{% endif %}
+                            ">
+                                {{ level|title }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge badge-status-reported">
+                                {{ alert.get_status_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="muted">Prediction (Bus load)</span>
+                        </td>
+                        <td>{{ alert.created_at|date:"Y-m-d H:i" }}</td>
+                    </tr>
+                    {% endwith %}
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="8" class="muted">No overflow predictions for this date.</td>
                 </tr>
             {% endif %}
             </tbody>
