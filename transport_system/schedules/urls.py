@@ -15,4 +15,6 @@ urlpatterns = [
     path('api/buses/nearby/', views.nearby_buses, name='nearby-buses'),
     path('api/buses/update-location/', views.update_bus_location, name='update-bus-location'),
     path('api/buses/<int:bus_id>/', views.bus_details, name='bus-details'),
+    path('api/schedules/passenger-count/', views.update_passenger_count, name='update-passenger-count'),
+    
 ]

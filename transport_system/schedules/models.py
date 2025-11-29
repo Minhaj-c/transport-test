@@ -146,6 +146,15 @@ class Schedule(models.Model):
     available_seats = models.PositiveIntegerField(
         help_text="Currently available seats"
     )
+    current_passengers = models.PositiveIntegerField(
+        default=0,
+        help_text="Live passenger count reported by driver app"
+    )
+    last_passenger_update = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When driver last updated passenger count"
+    )
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
@@ -183,6 +192,28 @@ class Schedule(models.Model):
             self.save()
             return True
         return False
+    
+    def set_passenger_count(self, count: int):
+        """
+        Update current passenger count and keep available seats in sync.
+        """
+        from django.utils import timezone
+
+        safe_count = max(0, int(count))
+        self.current_passengers = safe_count
+        self.last_passenger_update = timezone.now()
+
+        # If you are using total_seats / available_seats, keep it updated
+        if hasattr(self, "total_seats") and self.total_seats is not None:
+            self.available_seats = max(0, self.total_seats - safe_count)
+
+        self.save(
+            update_fields=[
+                "current_passengers",
+                "last_passenger_update",
+                "available_seats",
+            ]
+        )
 
 
 class BusSchedule(models.Model):

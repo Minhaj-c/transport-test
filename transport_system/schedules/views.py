@@ -13,9 +13,11 @@ from django.utils import timezone
 from django.shortcuts import render
 from datetime import timedelta
 import math
-
+from django.views.decorators.csrf import csrf_exempt
+from django.shortcuts import get_object_or_404
 from .models import Schedule, Bus
 from .serializers import ScheduleSerializer, LiveBusSerializer, BusLocationSerializer
+from routes.models import Route
 
 
 class ScheduleListView(generics.ListAPIView):
@@ -128,67 +130,84 @@ def nearby_buses(request):
     })
 
 
-@api_view(['POST'])
+@csrf_exempt
+@api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def update_bus_location(request):
     """
-    Driver endpoint to update bus location
-    
+    Driver updates bus GPS location and marks bus/schedule as running.
+
     POST /api/buses/update-location/
     {
         "bus_id": 1,
-        "latitude": 11.2588,
-        "longitude": 75.7804,
-        "schedule_id": 5
+        "latitude": 11.874321,
+        "longitude": 75.370123,
+        "schedule_id": 12
     }
     """
-    # Only drivers can update location
-    if request.user.role != 'driver':
+    user = request.user
+    data = request.data
+
+    bus_id = data.get("bus_id")
+    lat = data.get("latitude")
+    lng = data.get("longitude")
+    schedule_id = data.get("schedule_id")
+
+    if not all([bus_id, lat, lng, schedule_id]):
         return Response(
-            {'error': 'Only drivers can update bus locations'},
-            status=status.HTTP_403_FORBIDDEN
+            {"detail": "bus_id, latitude, longitude and schedule_id are required."},
+            status=status.HTTP_400_BAD_REQUEST,
         )
-    
+
+    bus = get_object_or_404(Bus, id=bus_id)
+    schedule = get_object_or_404(
+        Schedule.objects.select_related("route", "driver"),
+        id=schedule_id,
+    )
+
+    # Only assigned driver or superuser can update
+    if schedule.driver_id != user.id and not user.is_superuser:
+        return Response(
+            {"detail": "Only the assigned driver can update location."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
     try:
-        latitude = float(request.data.get('latitude'))
-        longitude = float(request.data.get('longitude'))
-        bus_id = request.data.get('bus_id')
-        schedule_id = request.data.get('schedule_id')
+        lat = float(lat)
+        lng = float(lng)
     except (TypeError, ValueError):
         return Response(
-            {'error': 'Invalid data provided'},
-            status=status.HTTP_400_BAD_REQUEST
+            {"detail": "Invalid latitude/longitude."},
+            status=status.HTTP_400_BAD_REQUEST,
         )
-    
-    try:
-        bus = Bus.objects.get(id=bus_id)
-        
-        # Update location
-        bus.update_location(latitude, longitude)
-        bus.is_running = True
-        
-        # If schedule provided, link it
-        if schedule_id:
-            try:
-                schedule = Schedule.objects.get(id=schedule_id, driver=request.user)
-                bus.current_schedule = schedule
-                bus.current_route = schedule.route
-            except Schedule.DoesNotExist:
-                pass
-        
-        bus.save()
-        
-        return Response({
-            'success': True,
-            'message': 'Location updated successfully',
-            'bus': BusLocationSerializer(bus).data
-        })
-        
-    except Bus.DoesNotExist:
-        return Response(
-            {'error': 'Bus not found'},
-            status=status.HTTP_404_NOT_FOUND
-        )
+
+    # Update bus
+    from django.utils import timezone
+
+    bus.current_latitude = lat
+    bus.current_longitude = lng
+    bus.last_location_update = timezone.now()
+    bus.is_running = True
+    bus.current_route = schedule.route
+    bus.current_schedule = schedule
+    bus.save(
+        update_fields=[
+            "current_latitude",
+            "current_longitude",
+            "last_location_update",
+            "is_running",
+            "current_route",
+            "current_schedule",
+        ]
+    )
+
+    return Response(
+        {
+            "success": True,
+            "message": "Bus location updated.",
+        }
+    )
+
 
 
 @api_view(['GET'])
@@ -240,3 +259,60 @@ def schedules_page(request):
     route_id = request.GET.get('route_id')
     context = {'route_id': route_id}
     return render(request, 'schedules.html', context)
+
+
+@csrf_exempt
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def update_passenger_count(request):
+    """
+    Driver updates live passenger count for a schedule.
+
+    POST /api/schedules/passenger-count/
+    {
+        "schedule_id": 12,
+        "count": 37
+    }
+    """
+    user = request.user
+    schedule_id = request.data.get("schedule_id")
+    count = request.data.get("count")
+
+    if schedule_id is None or count is None:
+        return Response(
+            {"detail": "schedule_id and count are required."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        count = int(count)
+        if count < 0:
+            raise ValueError
+    except ValueError:
+        return Response(
+            {"detail": "Invalid count value."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    schedule = get_object_or_404(
+        Schedule.objects.select_related("driver", "bus"),
+        id=schedule_id,
+    )
+
+    # Allow only this schedule's driver or superuser
+    if schedule.driver_id != user.id and not user.is_superuser:
+        return Response(
+            {"detail": "Only the assigned driver can update passenger count."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    schedule.set_passenger_count(count)
+
+    return Response(
+        {
+            "success": True,
+            "message": "Passenger count updated.",
+            "current_passengers": schedule.current_passengers,
+            "available_seats": getattr(schedule, "available_seats", None),
+        }
+    )
