@@ -6,7 +6,7 @@ Schedules API Views
 """
 
 from rest_framework import generics, status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes,authentication_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.utils import timezone
@@ -18,6 +18,16 @@ from django.shortcuts import get_object_or_404
 from .models import Schedule, Bus
 from .serializers import ScheduleSerializer, LiveBusSerializer, BusLocationSerializer
 from routes.models import Route
+from rest_framework.authentication import SessionAuthentication
+
+class CsrfExemptSessionAuthentication(SessionAuthentication):
+    """
+    SessionAuthentication that skips CSRF checks.
+
+    Needed for native/mobile apps that use cookies but can't send CSRF tokens.
+    """
+    def enforce_csrf(self, request):
+        return  # disable CSRF check
 
 
 class ScheduleListView(generics.ListAPIView):
@@ -132,6 +142,7 @@ def nearby_buses(request):
 
 @csrf_exempt
 @api_view(["POST"])
+@authentication_classes([CsrfExemptSessionAuthentication])
 @permission_classes([IsAuthenticated])
 def update_bus_location(request):
     """
@@ -153,7 +164,13 @@ def update_bus_location(request):
     lng = data.get("longitude")
     schedule_id = data.get("schedule_id")
 
+    # 🔍 DEBUG PRINTS
+    print("=== update_bus_location DEBUG ===")
+    print("Logged in user -> id:", user.id, "| email:", user.email, "| role:", getattr(user, "role", None))
+    print("Payload -> bus_id:", bus_id, "| schedule_id:", schedule_id, "| lat:", lat, "| lng:", lng)
+
     if not all([bus_id, lat, lng, schedule_id]):
+        print("❌ Missing fields in payload")
         return Response(
             {"detail": "bus_id, latitude, longitude and schedule_id are required."},
             status=status.HTTP_400_BAD_REQUEST,
@@ -165,8 +182,15 @@ def update_bus_location(request):
         id=schedule_id,
     )
 
+    print(
+        "Schedule in DB -> id:", schedule.id,
+        "| driver_id:", schedule.driver_id,
+        "| driver_email:", schedule.driver.email
+    )
+
     # Only assigned driver or superuser can update
     if schedule.driver_id != user.id and not user.is_superuser:
+        print("❌ PERMISSION DENIED: schedule.driver_id != user.id")
         return Response(
             {"detail": "Only the assigned driver can update location."},
             status=status.HTTP_403_FORBIDDEN,
@@ -176,12 +200,12 @@ def update_bus_location(request):
         lat = float(lat)
         lng = float(lng)
     except (TypeError, ValueError):
+        print("❌ Invalid latitude/longitude:", lat, lng)
         return Response(
             {"detail": "Invalid latitude/longitude."},
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # Update bus
     from django.utils import timezone
 
     bus.current_latitude = lat
@@ -200,6 +224,8 @@ def update_bus_location(request):
             "current_schedule",
         ]
     )
+
+    print("✅ Location updated OK for bus", bus.id, "| schedule", schedule.id)
 
     return Response(
         {

@@ -250,3 +250,235 @@ def debug_print_bus_load_for_schedule(schedule):
         )
     else:
         print("\n✅ Bus never exceeds capacity on this route with current data.")
+
+
+# zonaladmin/logic/alert_engine.py
+
+def get_overflow_warnings_for_schedule(schedule):
+    """
+    Small helper to summarize where the bus will overflow
+    using compute_bus_load_for_schedule().
+    """
+    data = compute_bus_load_for_schedule(schedule)
+
+    capacity = data["capacity"]
+    stops_info = data["stops"]
+
+    warnings = []
+    for row in stops_info:
+        stop = row["stop"]
+        expected = row["expected_load"]
+        if expected > capacity:
+            warnings.append(
+                {
+                    "stop": stop,
+                    "expected_load": expected,
+                    "extra": expected - capacity,
+                }
+            )
+
+    return {
+        "schedule": data["schedule"],
+        "route": data["route"],
+        "capacity": capacity,
+        "base_inside": data["base_inside"],
+        "stops": stops_info,
+        "will_overflow": data["will_overflow"],
+        "first_overflow_stop": data["first_overflow_stop"],
+        "overflow_amount": data["overflow_amount"],
+        "warnings": warnings,
+    }
+
+
+def compute_bus_load_for_schedule(schedule):
+    """
+    For ONE schedule:
+    - Start from current_passengers (driver app)
+    - Add NOTED pre-informs per stop (for this route + date)
+    - Return per-stop expected load and max load
+    """
+    from django.db.models import Sum
+
+    route = schedule.route
+    date = schedule.date
+
+    # Capacity: prefer schedule.total_seats, else bus.capacity, else 40
+    capacity = (
+        schedule.total_seats
+        or getattr(schedule.bus, "capacity", None)
+        or 40
+    )
+
+    base_passengers = schedule.current_passengers or 0
+
+    # Only NOTED pre-informs for this date+route
+    qs = PreInform.objects.filter(
+        route=route,
+        date_of_travel=date,
+        status="noted",
+    )
+
+    # Group by stop, ordered by route sequence
+    grouped = (
+        qs.values(
+            "boarding_stop",
+            "boarding_stop__name",
+            "boarding_stop__sequence",
+        )
+        .annotate(total_people=Sum("passenger_count"))
+        .order_by("boarding_stop__sequence")
+    )
+
+    rows = []
+    running = base_passengers
+    max_load = base_passengers
+
+    for row in grouped:
+        stop_id = row["boarding_stop"]
+        stop_name = row["boarding_stop__name"] or "Unknown stop"
+        seq = row["boarding_stop__sequence"] or 0
+        boarding = row["total_people"] or 0
+
+        running += boarding
+        max_load = max(max_load, running)
+
+        rows.append(
+            {
+                "stop_id": stop_id,
+                "stop_name": stop_name,
+                "sequence": seq,
+                "boarding": boarding,
+                "expected_load": running,
+                "over_capacity": running > capacity,
+                "ratio": (running / capacity) if capacity else None,
+            }
+        )
+
+    return {
+        "schedule": schedule,
+        "capacity": capacity,
+        "base_passengers": base_passengers,
+        "rows": rows,
+        "max_load": max_load,
+    }
+
+
+def debug_print_bus_load_for_schedule(schedule):
+    data = compute_bus_load_for_schedule(schedule)
+    route = schedule.route
+    cap = data["capacity"]
+
+    print(f"=== Bus Load Prediction for Schedule #{schedule.id} ===")
+    print(f"Route: {route.number} – {route.name}")
+    print(f"Date:  {schedule.date}")
+    print(f"Bus:   {schedule.bus.number_plate} (capacity {cap})")
+    print(f"Base passengers already inside: {data['base_passengers']}")
+    print("-" * 55)
+
+    if not data["rows"]:
+        print("No NOTED pre-informs for this schedule.")
+        return
+
+    for row in data["rows"]:
+        print(
+            f"Stop {row['sequence']}: {row['stop_name']:<25} | "
+            f"boarding +{row['boarding']:2d} | "
+            f"expected load = {row['expected_load']:3d}"
+        )
+
+    if data["max_load"] > cap:
+        print(
+            f"\n⚠️  Bus will exceed capacity! Max load = "
+            f"{data['max_load']} / {cap}"
+        )
+    else:
+        print(
+            f"\n✅ Bus never exceeds capacity on this route with current data "
+            f"(max load = {data['max_load']} / {cap})."
+        )
+
+
+def generate_prediction_alerts(for_date=None, zone=None):
+    """
+    NEW: Prediction-based demand alerts.
+
+    - Looks at *running* buses (bus.is_running = True)
+    - For each schedule, predicts load per stop
+    - If expected_load >= capacity (or very close), creates DemandAlert
+
+    These alerts are separate from "System (Pre-Informs)" alerts.
+    """
+    from schedules.models import Schedule
+
+    if for_date is None:
+        for_date = timezone.localdate()
+
+    # Base queryset: today's schedules whose buses are running
+    qs = Schedule.objects.select_related("bus", "route").filter(
+        date=for_date,
+        bus__is_running=True,
+    )
+
+    if zone is not None:
+        qs = qs.filter(route__zone=zone)
+
+    if not qs.exists():
+        return []
+
+    # Clear old prediction-based alerts for this date+zone
+    base_alerts = DemandAlert.objects.filter(
+        created_at__date=for_date,
+        admin_notes__icontains="Prediction:",
+    )
+    if zone is not None:
+        base_alerts = base_alerts.filter(stop__route__zone=zone)
+    base_alerts.delete()
+
+    created = []
+
+    for schedule in qs:
+        data = compute_bus_load_for_schedule(schedule)
+        cap = data["capacity"]
+
+        for row in data["rows"]:
+            stop_id = row["stop_id"]
+            load = row["expected_load"]
+            ratio = row["ratio"] or 0.0
+
+            # Threshold:
+            #  - if load > capacity  -> CRITICAL (definitely full)
+            #  - if ratio >= 0.9     -> HIGH (90%+ full)
+            if load <= 0:
+                continue
+
+            if load > cap:
+                level = "critical"
+            elif ratio >= 0.9:
+                level = "high"
+            else:
+                continue  # no alert for normal/medium predictions
+
+            try:
+                stop = Stop.objects.get(id=stop_id)
+            except Stop.DoesNotExist:
+                continue
+
+            note = (
+                f"Prediction: Bus on schedule #{schedule.id} for route "
+                f"{schedule.route.number} is expected to reach {level.upper()} load "
+                f"at stop '{row['stop_name']}' "
+                f"(expected {load} passengers, capacity {cap}). "
+                f"Base inside bus: {data['base_passengers']}. "
+                f"Source: NOTED pre-informs for {for_date}."
+            )
+
+            alert = DemandAlert.objects.create(
+                user=None,              # system-generated
+                stop=stop,
+                number_of_people=load,  # predicted load at this stop
+                status="reported",
+                admin_notes=note,
+            )
+            created.append(alert)
+
+    return created

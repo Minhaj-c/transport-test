@@ -15,6 +15,11 @@ from demand.models import DemandAlert
 # 🔹 Our alert engine (auto alerts from NOTED pre-informs)
 from zonaladmin.logic.alert_engine import generate_demand_alerts
 
+from zonaladmin.logic.alert_engine import (
+    compute_bus_load_for_schedule,
+    get_overflow_warnings_for_schedule,  # if you added helper
+)
+
 
 # Helper: get zone-specific queryset
 def filter_zone(queryset, user):
@@ -331,20 +336,32 @@ def assign_bus_view(request):
 @login_required
 def zonal_demand_alerts(request):
     user = request.user
+    today = timezone.localdate()
 
-    # For now we don't auto-generate here; alerts are generated when
-    # pre-informs are marked as NOTED. We just display them.
+    # Determine zone (for zonal admins only)
+    zone = None
+    if getattr(user, "role", None) == "zonal_admin" and getattr(user, "zone_id", None):
+        zone = user.zone
 
-    # Show only alerts for this zonal admin's zone
-    # AND only system-generated ones (from pre-informs).
+    # 1) Classical demand from NOTED pre-informs
+    from zonaladmin.logic.alert_engine import (
+        generate_demand_alerts,
+        generate_prediction_alerts,
+    )
+
+    generate_demand_alerts(for_date=today, zone=zone)
+
+    # 2) Prediction-based alerts using running buses + preinforms
+    generate_prediction_alerts(for_date=today, zone=zone)
+
+    # 3) Show combined alerts (filtered by zone via helper)
     alerts = filter_zone(
         DemandAlert.objects.select_related("stop", "stop__route", "user"),
-        user
-    ).filter(
-        user__isnull=True  # 🔥 system (pre-informs), not passenger reports
+        user,
     ).order_by("-created_at")
 
     return render(request, "zonaladmin/demand.html", {"alerts": alerts})
+
 
 
 # --------------------------
@@ -359,3 +376,52 @@ def zonal_routes(request):
     ).order_by("number")
 
     return render(request, "zonaladmin/routes.html", {"routes": routes})
+
+
+# --------------------------
+# 8) SCHEDULE LOAD PREDICTION PAGE
+# --------------------------
+@login_required
+def schedule_load_prediction(request, schedule_id):
+    """
+    Show bus load prediction for a single schedule:
+    - combines current_passengers (driver app)
+    - with NOTED + PENDING pre-informs for that route+date
+    - shows where bus will exceed capacity
+    """
+    user = request.user
+
+    # Load schedule with related route, bus, driver
+    schedule = get_object_or_404(
+        Schedule.objects.select_related("route", "bus", "driver"),
+        id=schedule_id,
+    )
+
+    # Zonal admin: make sure this route belongs to their zone
+    if getattr(user, "role", None) == "zonal_admin":
+        if schedule.route.zone_id != getattr(user, "zone_id", None):
+            return redirect("zonal-schedules")
+
+    # Use our prediction logic
+    try:
+        # If you added helper:
+        data = get_overflow_warnings_for_schedule(schedule)
+        # Or, if you don't want helper:
+        # data = compute_bus_load_for_schedule(schedule)
+    except Exception as exc:
+        # Basic safety: if prediction crashes, show a friendly error
+        return render(
+            request,
+            "zonaladmin/schedule_load.html",
+            {
+                "schedule": schedule,
+                "error": f"Could not compute prediction: {exc}",
+            },
+        )
+
+    context = {
+        "schedule": schedule,
+        "data": data,
+    }
+
+    return render(request, "zonaladmin/schedule_load.html", context)

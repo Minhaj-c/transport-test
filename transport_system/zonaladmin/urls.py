@@ -20,4 +20,7 @@ urlpatterns = [
 
     # Routes list
     path('routes/', views.zonal_routes, name='zonal-routes'),
+    
+    path("schedules/<int:schedule_id>/load/",views.schedule_load_prediction,name="schedule-load-prediction"),
+
 ]
