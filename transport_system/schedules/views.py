@@ -1,24 +1,23 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 
-# Create your views here.
 """
 Schedules API Views
 """
 
 from rest_framework import generics, status
-from rest_framework.decorators import api_view, permission_classes,authentication_classes
+from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.utils import timezone
-from django.shortcuts import render
 from datetime import timedelta
 import math
 from django.views.decorators.csrf import csrf_exempt
-from django.shortcuts import get_object_or_404
+
 from .models import Schedule, Bus
 from .serializers import ScheduleSerializer, LiveBusSerializer, BusLocationSerializer
 from routes.models import Route
 from rest_framework.authentication import SessionAuthentication
+
 
 class CsrfExemptSessionAuthentication(SessionAuthentication):
     """
@@ -29,6 +28,10 @@ class CsrfExemptSessionAuthentication(SessionAuthentication):
     def enforce_csrf(self, request):
         return  # disable CSRF check
 
+
+# ==========================
+#  BASIC SCHEDULE / BUS API
+# ==========================
 
 class ScheduleListView(generics.ListAPIView):
     """
@@ -73,18 +76,19 @@ def driver_schedules_view(request):
     
     GET /api/schedules/driver/
     """
-    if request.user.role != 'driver':
+    if getattr(request.user, "role", None) != 'driver':
         return Response(
             {'error': 'Only drivers can access this endpoint'},
             status=status.HTTP_403_FORBIDDEN
         )
     
-    # Get driver's schedules for today and future
     today = timezone.now().date()
-    schedules = Schedule.objects.filter(
-        driver=request.user,
-        date__gte=today
-    ).select_related('route', 'bus').order_by('date', 'departure_time')
+    schedules = (
+        Schedule.objects
+        .filter(driver=request.user, date__gte=today)
+        .select_related('route', 'bus')
+        .order_by('date', 'departure_time')
+    )
     
     serializer = ScheduleSerializer(schedules, many=True)
     return Response(serializer.data)
@@ -102,26 +106,32 @@ def nearby_buses(request):
         user_lng = float(request.GET.get('longitude'))
         radius_km = float(request.GET.get('radius', 5))
     except (TypeError, ValueError):
-        return Response({
-            'error': 'Invalid coordinates. Provide latitude, longitude, and optional radius.'
-        }, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {'error': 'Invalid coordinates. Provide latitude, longitude, and optional radius.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
     
-    # Get buses that are currently running (updated in last 5 minutes)
     five_minutes_ago = timezone.now() - timedelta(minutes=5)
     
-    running_buses = Bus.objects.filter(
-        is_running=True,
-        current_latitude__isnull=False,
-        current_longitude__isnull=False,
-        last_location_update__gte=five_minutes_ago
-    ).select_related('current_route', 'current_schedule')
+    running_buses = (
+        Bus.objects
+        .filter(
+            is_running=True,
+            current_latitude__isnull=False,
+            current_longitude__isnull=False,
+            last_location_update__gte=five_minutes_ago,
+        )
+        .select_related('current_route', 'current_schedule')
+    )
     
     nearby_buses_list = []
     
     for bus in running_buses:
         distance = calculate_distance(
-            user_lat, user_lng,
-            float(bus.current_latitude), float(bus.current_longitude)
+            user_lat,
+            user_lng,
+            float(bus.current_latitude),
+            float(bus.current_longitude),
         )
         
         if distance <= radius_km:
@@ -129,15 +139,16 @@ def nearby_buses(request):
             bus_data['distance_km'] = round(distance, 2)
             nearby_buses_list.append(bus_data)
     
-    # Sort by distance
     nearby_buses_list.sort(key=lambda x: x['distance_km'])
     
-    return Response({
-        'buses': nearby_buses_list,
-        'user_location': {'latitude': user_lat, 'longitude': user_lng},
-        'search_radius_km': radius_km,
-        'total_found': len(nearby_buses_list)
-    })
+    return Response(
+        {
+            'buses': nearby_buses_list,
+            'user_location': {'latitude': user_lat, 'longitude': user_lng},
+            'search_radius_km': radius_km,
+            'total_found': len(nearby_buses_list),
+        }
+    )
 
 
 @csrf_exempt
@@ -166,7 +177,11 @@ def update_bus_location(request):
 
     # 🔍 DEBUG PRINTS
     print("=== update_bus_location DEBUG ===")
-    print("Logged in user -> id:", user.id, "| email:", user.email, "| role:", getattr(user, "role", None))
+    print(
+        "Logged in user -> id:", user.id,
+        "| email:", getattr(user, "email", None),
+        "| role:", getattr(user, "role", None),
+    )
     print("Payload -> bus_id:", bus_id, "| schedule_id:", schedule_id, "| lat:", lat, "| lng:", lng)
 
     if not all([bus_id, lat, lng, schedule_id]):
@@ -185,10 +200,9 @@ def update_bus_location(request):
     print(
         "Schedule in DB -> id:", schedule.id,
         "| driver_id:", schedule.driver_id,
-        "| driver_email:", schedule.driver.email
+        "| driver_email:", schedule.driver.email,
     )
 
-    # Only assigned driver or superuser can update
     if schedule.driver_id != user.id and not user.is_superuser:
         print("❌ PERMISSION DENIED: schedule.driver_id != user.id")
         return Response(
@@ -205,8 +219,6 @@ def update_bus_location(request):
             {"detail": "Invalid latitude/longitude."},
             status=status.HTTP_400_BAD_REQUEST,
         )
-
-    from django.utils import timezone
 
     bus.current_latitude = lat
     bus.current_longitude = lng
@@ -228,40 +240,35 @@ def update_bus_location(request):
     print("✅ Location updated OK for bus", bus.id, "| schedule", schedule.id)
 
     return Response(
-        {
-            "success": True,
-            "message": "Bus location updated.",
-        }
+        {"success": True, "message": "Bus location updated."}
     )
-
 
 
 @api_view(['GET'])
 def bus_details(request, bus_id):
     """
-    Get detailed information about a specific bus
-    
-    GET /api/buses/<bus_id>/
+    Get detailed information about a specific running bus.
     """
     try:
-        bus = Bus.objects.select_related('current_route', 'current_schedule').get(
-            id=bus_id,
-            is_running=True
+        bus = (
+            Bus.objects
+            .select_related('current_route', 'current_schedule')
+            .get(id=bus_id, is_running=True)
         )
         return Response(LiveBusSerializer(bus).data)
     except Bus.DoesNotExist:
         return Response(
             {'error': 'Bus not found or not running'},
-            status=status.HTTP_404_NOT_FOUND
+            status=status.HTTP_404_NOT_FOUND,
         )
 
 
 def calculate_distance(lat1, lon1, lat2, lon2):
     """
-    Calculate distance between two coordinates using Haversine formula
-    Returns distance in kilometers
+    Calculate distance between two coordinates using Haversine formula.
+    Returns distance in kilometers.
     """
-    R = 6371  # Earth's radius in kilometers
+    R = 6371  # km
     
     lat1_rad = math.radians(lat1)
     lon1_rad = math.radians(lon1)
@@ -280,12 +287,16 @@ def calculate_distance(lat1, lon1, lat2, lon2):
 
 def schedules_page(request):
     """
-    Serve the schedules frontend page
+    Serve the schedules frontend page.
     """
     route_id = request.GET.get('route_id')
     context = {'route_id': route_id}
     return render(request, 'schedules.html', context)
 
+
+# ==========================
+#  LIVE PASSENGERS + STOP
+# ==========================
 
 @csrf_exempt
 @api_view(["POST"])
@@ -339,7 +350,6 @@ def update_passenger_count(request):
         "| old current_passengers:", getattr(schedule, "current_passengers", None),
     )
 
-    # Only this schedule's driver or superuser
     if schedule.driver_id != user.id and not user.is_superuser:
         print("❌ PERMISSION DENIED for user", user.id)
         return Response(
@@ -347,7 +357,6 @@ def update_passenger_count(request):
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    # 👇 use your model helper (you said you have set_passenger_count)
     schedule.set_passenger_count(count)
 
     print(
@@ -405,7 +414,6 @@ def update_current_stop(request):
         id=schedule_id,
     )
 
-    # Only that driver or admin can update
     if schedule.driver_id != user.id and not user.is_superuser:
         return Response(
             {"detail": "Only the assigned driver can update current stop."},
@@ -415,8 +423,6 @@ def update_current_stop(request):
     schedule.current_stop_sequence = stop_sequence
     schedule.save(update_fields=["current_stop_sequence"])
 
-    # You can later hook your prediction logic here.
-
     return Response(
         {
             "success": True,
@@ -424,3 +430,132 @@ def update_current_stop(request):
             "schedule": ScheduleSerializer(schedule).data,
         }
     )
+
+
+# ==========================
+# 🔮 PREDICTION / FORECAST
+# ==========================
+
+def compute_future_load_for_schedule(schedule):
+    """
+    Core prediction function.
+
+    Uses:
+      - schedule.current_passengers
+      - schedule.current_stop_sequence
+      - Pre-informs for this (route, date) AFTER current stop
+
+    Returns a dict that can be returned as JSON or used by admin demand views.
+    """
+    capacity = schedule.total_seats or (schedule.bus.capacity if schedule.bus else None)
+    current_passengers = schedule.current_passengers or 0
+    current_seq = schedule.current_stop_sequence or 0
+
+    if capacity is None:
+        capacity = 0
+
+    route = schedule.route
+    stops_qs = route.stops.all().order_by("sequence")
+
+    # ---- Get all future pre-informs ----
+    try:
+        from preinforms.models import PreInform
+
+        preinforms_qs = (
+            PreInform.objects
+            .filter(
+                route=route,
+                date_of_travel=schedule.date,
+                boarding_stop__sequence__gt=current_seq,
+            )
+            .select_related("boarding_stop")
+        )
+
+        future_demand = {}
+        for pi in preinforms_qs:
+            seq = pi.boarding_stop.sequence
+            incoming = getattr(pi, "passenger_count", None)
+            if incoming is None:
+                continue
+            future_demand.setdefault(seq, 0)
+            future_demand[seq] += incoming
+
+    except Exception as e:
+        print("⚠️ compute_future_load_for_schedule preinform error:", e)
+        future_demand = {}
+
+    # ---- Walk through future stops and accumulate ----
+    running_load = current_passengers
+    stops_output = []
+    will_overflow = False
+    overflow_from_stop_seq = None
+
+    for stop in stops_qs:
+        seq = stop.sequence
+
+        if seq <= current_seq:
+            continue
+
+        incoming = future_demand.get(seq, 0)
+        predicted_after = running_load + incoming
+        overflow_here = predicted_after > capacity
+
+        if overflow_here and not will_overflow:
+            will_overflow = True
+            overflow_from_stop_seq = seq
+
+        stops_output.append(
+            {
+                "sequence": seq,
+                "name": stop.name,
+                "incoming_preinform": incoming,
+                "predicted_after": predicted_after,
+                "overflow": overflow_here,
+            }
+        )
+
+        running_load = predicted_after
+
+    return {
+        "schedule_id": schedule.id,
+        "route": {
+            "id": route.id,
+            "number": route.number,
+            "name": route.name,
+        },
+        "capacity": capacity,
+        "current_stop_sequence": current_seq,
+        "current_passengers": current_passengers,
+        "future_stops": stops_output,
+        "will_overflow": will_overflow,
+        "overflow_from_stop_sequence": overflow_from_stop_seq,
+    }
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def schedule_forecast_view(request, schedule_id):
+    """
+    Get predicted load for a specific schedule,
+    starting from its current_stop_sequence and current_passengers.
+
+    GET /api/schedules/<schedule_id>/forecast/
+    """
+    user = request.user
+
+    schedule = get_object_or_404(
+        Schedule.objects.select_related("route", "bus", "driver"),
+        id=schedule_id,
+    )
+
+    # Only this driver OR staff/superuser
+    if schedule.driver_id != user.id and not (
+        getattr(user, "is_staff", False) or getattr(user, "is_superuser", False)
+    ):
+        return Response(
+            {"detail": "You are not allowed to view this schedule forecast."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    forecast = compute_future_load_for_schedule(schedule)
+    return Response(forecast, status=status.HTTP_200_OK)

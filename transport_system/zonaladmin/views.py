@@ -357,6 +357,18 @@ def assign_bus_view(request):
 # --------------------------
 @login_required
 def zonal_demand_alerts(request):
+    """
+    Shows two sections:
+
+    - Pre-inform alerts: people waiting at stops (from NOTED pre-informs)
+    - Prediction alerts: expected people inside buses after each stop
+      (built from running-bus prediction engine)
+
+    For prediction alerts we try to attach a schedule_guess:
+    - We don't have a schedule FK on DemandAlert
+    - So we try to find a running schedule on that route & date
+      and expose it as alert.derived_schedule for the template.
+    """
     user = request.user
 
     # --- Date filter (optional, default = today) ---
@@ -374,12 +386,6 @@ def zonal_demand_alerts(request):
     if getattr(user, "role", None) == "zonal_admin" and getattr(user, "zone_id", None):
         zone = user.zone
 
-    # Import here to avoid circular imports
-    from zonaladmin.logic.alert_engine import (
-        generate_demand_alerts,
-        generate_prediction_alerts,
-    )
-
     # 1) Classical demand from NOTED pre-informs
     generate_demand_alerts(for_date=selected_date, zone=zone)
 
@@ -387,15 +393,41 @@ def zonal_demand_alerts(request):
     generate_prediction_alerts(for_date=selected_date, zone=zone)
 
     # 3) Load alerts only for this date (+ zone via filter_zone)
-    base_qs = DemandAlert.objects.select_related("stop", "stop__route", "user") \
-        .filter(created_at__date=selected_date) \
+    base_qs = (
+        DemandAlert.objects
+        .select_related("stop", "stop__route", "user")   # ✅ NO 'schedule' HERE
+        .filter(created_at__date=selected_date)
         .order_by("-created_at")
-
+    )
     base_qs = filter_zone(base_qs, user)
 
     # Split into two groups using text we set in admin_notes
-    preinform_alerts = base_qs.filter(admin_notes__icontains="Pre-Informs")
-    prediction_alerts = base_qs.filter(admin_notes__icontains="Prediction (Bus load)")
+    preinform_qs = base_qs.filter(admin_notes__icontains="Pre-Informs")
+    prediction_qs = base_qs.filter(admin_notes__icontains="Prediction (Bus load)")
+
+    # Turn into lists so we can attach attributes
+    preinform_alerts = list(preinform_qs)
+    prediction_alerts = list(prediction_qs)
+
+    # Try to attach a guessed schedule for prediction alerts
+    for alert in prediction_alerts:
+        stop_route = getattr(alert.stop, "route", None)
+        if not stop_route:
+            alert.derived_schedule = None
+            continue
+
+        sched = (
+            Schedule.objects
+            .select_related("bus")
+            .filter(
+                route=stop_route,
+                date=selected_date,
+                bus__is_running=True,
+            )
+            .order_by("departure_time")
+            .first()
+        )
+        alert.derived_schedule = sched
 
     context = {
         "user": user,
@@ -405,6 +437,7 @@ def zonal_demand_alerts(request):
     }
 
     return render(request, "zonaladmin/demand.html", context)
+
 
 # --------------------------
 # 7) ROUTES PAGE
