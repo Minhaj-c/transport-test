@@ -156,6 +156,12 @@ class Schedule(models.Model):
         help_text="When driver last updated passenger count"
     )
     
+    current_stop_sequence = models.PositiveIntegerField(
+        default=0,
+        blank=True,
+        help_text="Sequence number of the current stop in the route",
+    )
+    
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -214,6 +220,8 @@ class Schedule(models.Model):
                 "available_seats",
             ]
         )
+        
+        
 
 
 class BusSchedule(models.Model):

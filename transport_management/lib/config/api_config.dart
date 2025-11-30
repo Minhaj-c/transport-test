@@ -38,4 +38,7 @@ class ApiConfig {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   };
+
+  static String get updateCurrentStop =>
+      '$baseUrl/api/schedules/current-stop/';
 }

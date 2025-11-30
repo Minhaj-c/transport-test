@@ -12,8 +12,9 @@ class DriverScheduleScreen extends StatefulWidget {
   State<DriverScheduleScreen> createState() => DriverScheduleScreenState();
 }
 
-// 👇 Make the state class accessible globally so we can share state
-class DriverScheduleScreenState extends State<DriverScheduleScreen> with AutomaticKeepAliveClientMixin {
+// 👇 State is public so other widgets can refer to it if needed
+class DriverScheduleScreenState extends State<DriverScheduleScreen>
+    with AutomaticKeepAliveClientMixin {
   List<Schedule> _schedules = [];
   bool _isLoading = true;
   String? _error;
@@ -38,8 +39,7 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen> with Automat
 
     try {
       final schedules = await ApiService.getDriverSchedules();
-      
-      // 👇 Check if any schedule is currently running
+
       final now = DateTime.now();
       final todaySchedules = schedules.where((s) {
         return s.date.year == now.year &&
@@ -47,14 +47,13 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen> with Automat
             s.date.day == now.day;
       }).toList();
 
-      // If we had an active schedule running, keep it
+      // If we already have an active schedule running, keep it matched
       if (_isRunning && _activeSchedule != null) {
-        // Find the matching schedule from the fresh data
         final matchingSchedule = todaySchedules.firstWhere(
           (s) => s.id == _activeSchedule!.id,
           orElse: () => _activeSchedule!,
         );
-        
+
         if (mounted) {
           setState(() {
             _schedules = schedules;
@@ -85,7 +84,7 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen> with Automat
 
     try {
       final position = await LocationService.getCurrentLocation();
-      
+
       if (position == null) {
         throw Exception('Could not get location. Please enable GPS.');
       }
@@ -97,52 +96,52 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen> with Automat
         scheduleId: schedule.id,
       );
 
-      if (mounted) {
-        setState(() {
-          _activeSchedule = schedule;
-          _isRunning = true;
-          _isStarting = false;
-        });
+      if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 12),
-                Text('Bus started successfully!'),
-              ],
-            ),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
+      setState(() {
+        _activeSchedule = schedule;
+        _isRunning = true;
+        _isStarting = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white),
+              SizedBox(width: 12),
+              Text('Bus started successfully!'),
+            ],
           ),
-        );
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
 
-        _startLocationTracking(schedule);
-      }
+      _startLocationTracking(schedule);
     } catch (e) {
-      if (mounted) {
-        setState(() => _isStarting = false);
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(child: Text('Error: ${e.toString()}')),
-              ],
-            ),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 4),
-            action: SnackBarAction(
-              label: 'Retry',
-              textColor: Colors.white,
-              onPressed: () => _startBus(schedule),
-            ),
+      if (!mounted) return;
+
+      setState(() => _isStarting = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error, color: Colors.white),
+              SizedBox(width: 12),
+              Expanded(child: Text('Error: ${e.toString()}')),
+            ],
           ),
-        );
-      }
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+          action: SnackBarAction(
+            label: 'Retry',
+            textColor: Colors.white,
+            onPressed: () => _startBus(schedule),
+          ),
+        ),
+      );
     }
   }
 
@@ -150,7 +149,9 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen> with Automat
     if (!_isRunning || _activeSchedule?.id != schedule.id) return;
 
     Future.delayed(const Duration(seconds: 30), () async {
-      if (!mounted || !_isRunning || _activeSchedule?.id != schedule.id) return;
+      if (!mounted || !_isRunning || _activeSchedule?.id != schedule.id) {
+        return;
+      }
 
       try {
         final position = await LocationService.getCurrentLocation();
@@ -161,35 +162,134 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen> with Automat
             longitude: position.longitude,
             scheduleId: schedule.id,
           );
-          
+
           _startLocationTracking(schedule);
         }
       } catch (e) {
+        // Even if one update fails, continue tracking
         if (mounted) _startLocationTracking(schedule);
       }
     });
   }
 
   void _stopBus() {
-    if (mounted) {
-      setState(() {
-        _isRunning = false;
-        _activeSchedule = null;
-      });
+    if (!mounted) return;
 
+    setState(() {
+      _isRunning = false;
+      _activeSchedule = null;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.stop_circle, color: Colors.white),
+            SizedBox(width: 12),
+            Text('Bus stopped'),
+          ],
+        ),
+        backgroundColor: Colors.orange,
+      ),
+    );
+  }
+
+  // 🔥 CURRENT STOP PICKER
+  void _showCurrentStopPicker(Schedule schedule) {
+    // Your Route model should expose this as List<Stop> or similar:
+    final stops = schedule.route.stops;
+
+    if (stops.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.stop_circle, color: Colors.white),
-              SizedBox(width: 12),
-              Text('Bus stopped'),
-            ],
-          ),
-          backgroundColor: Colors.orange,
+          content: Text('No stops found for this route'),
+          backgroundColor: Colors.red,
         ),
       );
+      return;
     }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true, // let us set a custom height
+      builder: (context) {
+        return SafeArea(
+          child: SizedBox(
+            height: 400, // fixed height instead of Expanded inside min Column
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text(
+                    'Select current stop',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const Divider(height: 0),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: stops.length,
+                    itemBuilder: (context, index) {
+                      final stop = stops[index];
+
+                      // Adjust field names to your Stop model
+                      final String stopName = stop.name;
+                      final int stopSeq = stop.sequence;
+
+                      final isCurrent =
+                          schedule.currentStopSequence != null &&
+                          schedule.currentStopSequence == stopSeq;
+
+                      return ListTile(
+                        title: Text(stopName),
+                        subtitle: Text('Stop #$stopSeq'),
+                        trailing: isCurrent
+                            ? const Icon(Icons.check, color: Colors.green)
+                            : null,
+                        onTap: () async {
+                          Navigator.pop(context);
+
+                          try {
+                            final resp = await ApiService.updateCurrentStop(
+                              scheduleId: schedule.id,
+                              stopSequence: stopSeq,
+                            );
+                            print('✅ Current stop updated: $resp');
+
+                            await _loadSchedules();
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Current stop set to "$stopName"',
+                                ),
+                              ),
+                            );
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Failed to update current stop: $e',
+                                ),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -234,8 +334,10 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen> with Automat
             _ActiveScheduleCard(
               schedule: _activeSchedule!,
               onStop: _stopBus,
+              onUpdateCurrentStop: () => _showCurrentStopPicker(
+                _activeSchedule!,
+              ),
             ),
-
           Expanded(
             child: _schedules.isEmpty
                 ? Center(
@@ -244,7 +346,8 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen> with Automat
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.event_busy, size: 64, color: Colors.grey[400]),
+                          Icon(Icons.event_busy,
+                              size: 64, color: Colors.grey[400]),
                           const SizedBox(height: 16),
                           Text(
                             'No schedules assigned',
@@ -299,10 +402,12 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen> with Automat
 class _ActiveScheduleCard extends StatelessWidget {
   final Schedule schedule;
   final VoidCallback onStop;
+  final VoidCallback onUpdateCurrentStop;
 
   const _ActiveScheduleCard({
     required this.schedule,
     required this.onStop,
+    required this.onUpdateCurrentStop,
   });
 
   @override
@@ -340,11 +445,11 @@ class _ActiveScheduleCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       'Bus Running',
                       style: TextStyle(
                         fontSize: 18,
@@ -352,13 +457,22 @@ class _ActiveScheduleCard extends StatelessWidget {
                         color: Colors.white,
                       ),
                     ),
-                    Text(
+                    const Text(
                       'Location tracking active',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.white70,
                       ),
                     ),
+                    const SizedBox(height: 4),
+                    if (schedule.currentStopSequence != null)
+                      Text(
+                        'Current stop: #${schedule.currentStopSequence}',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -405,6 +519,23 @@ class _ActiveScheduleCard extends StatelessWidget {
               ],
             ),
           ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onUpdateCurrentStop,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: const BorderSide(color: Colors.white70),
+              ),
+              icon: const Icon(Icons.place),
+              label: Text(
+                schedule.currentStopSequence == null
+                    ? 'Set current stop'
+                    : 'Change current stop',
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -444,6 +575,7 @@ class _ScheduleCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Date row
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -478,6 +610,7 @@ class _ScheduleCard extends StatelessWidget {
             ),
             const Divider(),
 
+            // Route info
             Text(
               'Route ${schedule.route.number}',
               style: const TextStyle(
@@ -491,6 +624,7 @@ class _ScheduleCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
 
+            // Origin / destination
             Row(
               children: [
                 const Icon(Icons.trip_origin, size: 16, color: Colors.green),
@@ -508,6 +642,7 @@ class _ScheduleCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
+            // Time
             Row(
               children: [
                 const Icon(Icons.access_time, size: 16),
@@ -520,6 +655,7 @@ class _ScheduleCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
 
+            // Bus
             Row(
               children: [
                 const Icon(Icons.directions_bus, size: 16),
@@ -532,6 +668,7 @@ class _ScheduleCard extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
+            // Start button
             if (isToday && !isActive)
               SizedBox(
                 width: double.infinity,
@@ -543,13 +680,14 @@ class _ScheduleCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     disabledBackgroundColor: Colors.grey,
                   ),
-                  icon: isStarting 
+                  icon: isStarting
                       ? const SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation(Colors.white),
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         )
                       : const Icon(Icons.play_arrow),

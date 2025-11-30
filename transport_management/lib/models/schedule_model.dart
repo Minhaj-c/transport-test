@@ -18,7 +18,8 @@ class Schedule {
   final bool? isRunning;                
   final String? nextStopName;           
   final int? overflowLoad;              
-  final int? maxLoad;                   
+  final int? maxLoad;         
+  final int? currentStopSequence;          
 
   Schedule({
     required this.id,
@@ -36,6 +37,7 @@ class Schedule {
     this.nextStopName,
     this.overflowLoad,
     this.maxLoad,
+    this.currentStopSequence,
   });
 
   factory Schedule.fromJson(Map<String, dynamic> json) {
@@ -69,6 +71,7 @@ class Schedule {
       nextStopName: json['next_stop_name'],
       overflowLoad: json['overflow_load'],
       maxLoad: json['max_load'],
+       currentStopSequence: json['current_stop_sequence'],
     );
   }
 

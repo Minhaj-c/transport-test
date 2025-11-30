@@ -391,4 +391,45 @@ class ApiService {
       rethrow;
     }
   }
+
+  // -----------------------------
+// 🔥 NEW: Update current stop (Driver)
+// -----------------------------
+static Future<Map<String, dynamic>> updateCurrentStop({
+  required int scheduleId,
+  required int stopSequence,
+}) async {
+  print('🚏 updateCurrentStop CALLED');
+  print('   scheduleId: $scheduleId');
+  print('   stopSequence: $stopSequence');
+  print('   URL: ${ApiConfig.updateCurrentStop}');
+  print('   Headers: $_headers');
+
+  final body = json.encode({
+    'schedule_id': scheduleId,
+    'stop_sequence': stopSequence,
+  });
+
+  final response = await http.post(
+    Uri.parse(ApiConfig.updateCurrentStop),
+    headers: _headers,
+    body: body,
+  );
+
+  print('🚏 updateCurrentStop status: ${response.statusCode}');
+  print('🚏 updateCurrentStop body: ${response.body}');
+
+  if (response.statusCode == 200) {
+    return json.decode(response.body) as Map<String, dynamic>;
+  } else if (response.statusCode == 401) {
+    throw Exception('Authentication required');
+  } else if (response.statusCode == 403) {
+    throw Exception('Only the assigned driver can update current stop');
+  } else {
+    throw Exception(
+      'Failed to update current stop (${response.statusCode})',
+    );
+  }
+}
+
 }

@@ -364,3 +364,63 @@ def update_passenger_count(request):
             "available_seats": getattr(schedule, "available_seats", None),
         }
     )
+    
+    
+@csrf_exempt 
+@api_view(["POST"])
+@authentication_classes([CsrfExemptSessionAuthentication])
+@permission_classes([IsAuthenticated])
+def update_current_stop(request):
+    """
+    Driver updates the CURRENT STOP of a running schedule.
+
+    POST /api/schedules/current-stop/
+    {
+        "schedule_id": 7,
+        "stop_sequence": 3
+    }
+    """
+    user = request.user
+    schedule_id = request.data.get("schedule_id")
+    stop_sequence = request.data.get("stop_sequence")
+
+    if schedule_id is None or stop_sequence is None:
+        return Response(
+            {"detail": "schedule_id and stop_sequence are required."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        stop_sequence = int(stop_sequence)
+        if stop_sequence <= 0:
+            raise ValueError
+    except ValueError:
+        return Response(
+            {"detail": "Invalid stop_sequence value."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    schedule = get_object_or_404(
+        Schedule.objects.select_related("driver", "bus", "route"),
+        id=schedule_id,
+    )
+
+    # Only that driver or admin can update
+    if schedule.driver_id != user.id and not user.is_superuser:
+        return Response(
+            {"detail": "Only the assigned driver can update current stop."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    schedule.current_stop_sequence = stop_sequence
+    schedule.save(update_fields=["current_stop_sequence"])
+
+    # You can later hook your prediction logic here.
+
+    return Response(
+        {
+            "success": True,
+            "message": "Current stop updated.",
+            "schedule": ScheduleSerializer(schedule).data,
+        }
+    )

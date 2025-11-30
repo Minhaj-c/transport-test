@@ -100,8 +100,9 @@ class ScheduleSerializer(serializers.ModelSerializer):
             'arrival_time',
             'total_seats',
             'available_seats',
-            'current_passengers',      # 👈 NEW
-            'last_passenger_update',   # 👈 NEW (optional but nice)
+            'current_passengers',    
+            'last_passenger_update', 
+            'current_stop_sequence',  
         ]
     
     def get_driver(self, obj):
