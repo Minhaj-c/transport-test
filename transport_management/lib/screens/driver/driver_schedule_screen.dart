@@ -9,16 +9,20 @@ class DriverScheduleScreen extends StatefulWidget {
   const DriverScheduleScreen({super.key});
 
   @override
-  State<DriverScheduleScreen> createState() => _DriverScheduleScreenState();
+  State<DriverScheduleScreen> createState() => DriverScheduleScreenState();
 }
 
-class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
+// 👇 Make the state class accessible globally so we can share state
+class DriverScheduleScreenState extends State<DriverScheduleScreen> with AutomaticKeepAliveClientMixin {
   List<Schedule> _schedules = [];
   bool _isLoading = true;
   String? _error;
   Schedule? _activeSchedule;
   bool _isRunning = false;
   bool _isStarting = false;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -34,11 +38,37 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
 
     try {
       final schedules = await ApiService.getDriverSchedules();
-      if (mounted) {
-        setState(() {
-          _schedules = schedules;
-          _isLoading = false;
-        });
+      
+      // 👇 Check if any schedule is currently running
+      final now = DateTime.now();
+      final todaySchedules = schedules.where((s) {
+        return s.date.year == now.year &&
+            s.date.month == now.month &&
+            s.date.day == now.day;
+      }).toList();
+
+      // If we had an active schedule running, keep it
+      if (_isRunning && _activeSchedule != null) {
+        // Find the matching schedule from the fresh data
+        final matchingSchedule = todaySchedules.firstWhere(
+          (s) => s.id == _activeSchedule!.id,
+          orElse: () => _activeSchedule!,
+        );
+        
+        if (mounted) {
+          setState(() {
+            _schedules = schedules;
+            _activeSchedule = matchingSchedule;
+            _isLoading = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _schedules = schedules;
+            _isLoading = false;
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -54,14 +84,12 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
     setState(() => _isStarting = true);
 
     try {
-      // Get current location
       final position = await LocationService.getCurrentLocation();
       
       if (position == null) {
         throw Exception('Could not get location. Please enable GPS.');
       }
 
-      // Update bus location
       await ApiService.updateBusLocation(
         busId: schedule.bus.id,
         latitude: position.latitude,
@@ -90,7 +118,6 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
           ),
         );
 
-        // Start location tracking
         _startLocationTracking(schedule);
       }
     } catch (e) {
@@ -122,7 +149,6 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
   void _startLocationTracking(Schedule schedule) {
     if (!_isRunning || _activeSchedule?.id != schedule.id) return;
 
-    // Update location every 30 seconds
     Future.delayed(const Duration(seconds: 30), () async {
       if (!mounted || !_isRunning || _activeSchedule?.id != schedule.id) return;
 
@@ -136,12 +162,9 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
             scheduleId: schedule.id,
           );
           
-          // Continue tracking
           _startLocationTracking(schedule);
         }
       } catch (e) {
-        print('Location update failed: $e');
-        // Continue tracking even if one update fails
         if (mounted) _startLocationTracking(schedule);
       }
     });
@@ -171,6 +194,8 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+
     if (_isLoading && _schedules.isEmpty) {
       return const LoadingWidget(message: 'Loading your schedule...');
     }
@@ -205,14 +230,12 @@ class _DriverScheduleScreenState extends State<DriverScheduleScreen> {
       onRefresh: _loadSchedules,
       child: Column(
         children: [
-          // Active Schedule Card
           if (_isRunning && _activeSchedule != null)
             _ActiveScheduleCard(
               schedule: _activeSchedule!,
               onStop: _stopBus,
             ),
 
-          // Schedule List
           Expanded(
             child: _schedules.isEmpty
                 ? Center(
@@ -421,7 +444,6 @@ class _ScheduleCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Date
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -456,7 +478,6 @@ class _ScheduleCard extends StatelessWidget {
             ),
             const Divider(),
 
-            // Route
             Text(
               'Route ${schedule.route.number}',
               style: const TextStyle(
@@ -470,7 +491,6 @@ class _ScheduleCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
 
-            // Route path
             Row(
               children: [
                 const Icon(Icons.trip_origin, size: 16, color: Colors.green),
@@ -488,7 +508,6 @@ class _ScheduleCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // Timing
             Row(
               children: [
                 const Icon(Icons.access_time, size: 16),
@@ -501,7 +520,6 @@ class _ScheduleCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
 
-            // Bus
             Row(
               children: [
                 const Icon(Icons.directions_bus, size: 16),
@@ -514,7 +532,6 @@ class _ScheduleCard extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // Start button
             if (isToday && !isActive)
               SizedBox(
                 width: double.infinity,

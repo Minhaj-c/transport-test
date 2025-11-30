@@ -14,14 +14,18 @@ class DriverHomeScreen extends StatefulWidget {
 class _DriverHomeScreenState extends State<DriverHomeScreen> {
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = [
-    const DriverScheduleScreen(),
-    const PassengerCounterScreen(),
-  ];
+  // 👇 GlobalKey keeps the schedule screen state alive
+  final GlobalKey<DriverScheduleScreenState> _scheduleKey = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
+
+    // 👇 Create screens with keys to preserve state
+    final List<Widget> screens = [
+      DriverScheduleScreen(key: _scheduleKey),
+      const PassengerCounterScreen(),
+    ];
 
     return Scaffold(
       appBar: AppBar(
@@ -35,7 +39,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           ),
         ],
       ),
-      body: _screens[_selectedIndex],
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: screens,
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (index) {

@@ -21,6 +21,7 @@ class ApiConfig {
   static const String driverSchedules = '$baseUrl/api/schedules/driver/';
   static const String nearbyBuses = '$baseUrl/api/buses/nearby/';
   static const String updateBusLocation = '$baseUrl/api/buses/update-location/';
+  static const String updatePassengerCount = '$baseUrl/api/schedules/passenger-count/';  // ✅ FIXED
   static String busDetails(int id) => '$baseUrl/api/buses/$id/';
   
   // PreInforms

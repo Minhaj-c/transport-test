@@ -24,7 +24,9 @@ class ApiService {
     return headers;
   }
 
+  // -----------------------------
   // Routes
+  // -----------------------------
   static Future<List<BusRoute>> getRoutes() async {
     try {
       print('Fetching routes from: ${ApiConfig.routes}');
@@ -69,7 +71,9 @@ class ApiService {
     }
   }
 
-  // Schedules
+  // -----------------------------
+  // Schedules (public)
+  // -----------------------------
   static Future<List<Schedule>> getSchedules({int? routeId, String? date}) async {
     try {
       var url = ApiConfig.schedules;
@@ -107,6 +111,9 @@ class ApiService {
     }
   }
 
+  // -----------------------------
+  // Driver schedules
+  // -----------------------------
   static Future<List<Schedule>> getDriverSchedules() async {
     try {
       print('Fetching driver schedules from: ${ApiConfig.driverSchedules}');
@@ -137,7 +144,9 @@ class ApiService {
     }
   }
 
+  // -----------------------------
   // PreInforms
+  // -----------------------------
   static Future<Map<String, dynamic>> createPreInform({
     required int routeId,
     required String dateOfTravel,
@@ -151,8 +160,8 @@ class ApiService {
 
       final body = {
         'route': routeId,
-        'date_of_travel': dateOfTravel,   // e.g. "2025-11-28"
-        'desired_time': desiredTime,      // e.g. "15:34"
+        'date_of_travel': dateOfTravel,
+        'desired_time': desiredTime,
         'boarding_stop': boardingStopId,
         'passenger_count': passengerCount,
       };
@@ -169,17 +178,14 @@ class ApiService {
       print('Create pre-inform body: ${response.body}');
 
       if (response.statusCode == 201) {
-        // Django view returns: { success, message, data: {...} }
         return json.decode(response.body) as Map<String, dynamic>;
       } else if (response.statusCode == 401) {
         throw Exception('Authentication required');
       } else {
-        // 🔥 Show real DRF validation errors instead of generic text
         try {
           final decoded = json.decode(response.body);
 
           if (decoded is Map<String, dynamic>) {
-            // 1) explicit error or detail message
             if (decoded['error'] is String) {
               throw Exception(decoded['error']);
             }
@@ -187,7 +193,6 @@ class ApiService {
               throw Exception(decoded['detail']);
             }
 
-            // 2) standard DRF field-errors: { "field": ["msg1", "msg2"], ... }
             final parts = <String>[];
             decoded.forEach((key, value) {
               if (value is List) {
@@ -202,11 +207,9 @@ class ApiService {
             }
           }
 
-          // Fallback if decoded is not a map or empty
           throw Exception(
               'Failed to create pre-inform (${response.statusCode})');
         } catch (inner) {
-          // If JSON decoding or above logic fails, still throw something useful
           print('Error parsing pre-inform error body: $inner');
           throw Exception(
               'Failed to create pre-inform (${response.statusCode})');
@@ -261,7 +264,9 @@ class ApiService {
     }
   }
 
+  // -----------------------------
   // Bus Location Update (Driver)
+  // -----------------------------
   static Future<void> updateBusLocation({
     required int busId,
     required double latitude,
@@ -284,18 +289,105 @@ class ApiService {
       );
 
       print('Update location response: ${response.statusCode}');
+      print('Update location body: ${response.body}');
 
       if (response.statusCode == 200) {
         print('Location updated successfully');
       } else if (response.statusCode == 401) {
         throw Exception('Authentication required');
       } else if (response.statusCode == 403) {
-        throw Exception('Only drivers can update location');
+        throw Exception('Only the assigned driver can update location');
       } else {
-        throw Exception('Failed to update location');
+        throw Exception('Failed to update location (${response.statusCode})');
       }
     } catch (e) {
       print('Error updating location: $e');
+      rethrow;
+    }
+  }
+
+  // -----------------------------
+  // 🔥 PASSENGER COUNT UPDATE - ENHANCED DEBUG VERSION
+  // -----------------------------
+  static Future<Map<String, dynamic>> updatePassengerCount({
+    required int scheduleId,
+    required int count,
+  }) async {
+    print('═══════════════════════════════════════════════════════════');
+    print('🚨 updatePassengerCount CALLED');
+    print('═══════════════════════════════════════════════════════════');
+    print('📍 Function entry point reached');
+    print('📊 Parameters:');
+    print('   - scheduleId: $scheduleId');
+    print('   - count: $count');
+    print('🌐 Target URL: ${ApiConfig.updatePassengerCount}');
+    print('🍪 Session cookie exists: ${_sessionCookie != null}');
+    print('🍪 Cookie value: $_sessionCookie');
+    
+    try {
+      final requestBody = {
+        'schedule_id': scheduleId,
+        'count': count,
+      };
+      
+      print('📦 Request body: ${json.encode(requestBody)}');
+      print('📋 Headers: $_headers');
+      print('⏱️  About to send HTTP POST...');
+      
+      final beforeRequest = DateTime.now();
+      
+      final response = await http.post(
+        Uri.parse(ApiConfig.updatePassengerCount),
+        headers: _headers,
+        body: json.encode(requestBody),
+      );
+      
+      final afterRequest = DateTime.now();
+      final duration = afterRequest.difference(beforeRequest).inMilliseconds;
+      
+      print('⏱️  Request completed in ${duration}ms');
+      print('📥 Response received:');
+      print('   - Status code: ${response.statusCode}');
+      print('   - Body: ${response.body}');
+      print('   - Headers: ${response.headers}');
+
+      if (response.statusCode == 200) {
+        print('✅ SUCCESS - Passenger count updated');
+        final decoded = json.decode(response.body) as Map<String, dynamic>;
+        print('📊 Decoded response: $decoded');
+        print('═══════════════════════════════════════════════════════════');
+        return decoded;
+      } else if (response.statusCode == 401) {
+        print('❌ ERROR 401 - Authentication required');
+        print('═══════════════════════════════════════════════════════════');
+        throw Exception('Authentication required');
+      } else if (response.statusCode == 403) {
+        print('❌ ERROR 403 - Permission denied');
+        print('═══════════════════════════════════════════════════════════');
+        throw Exception('Only the assigned driver can update passenger count');
+      } else {
+        print('❌ ERROR ${response.statusCode} - Server error');
+        try {
+          final decoded = json.decode(response.body);
+          if (decoded is Map<String, dynamic> && decoded['detail'] is String) {
+            print('Server message: ${decoded['detail']}');
+            print('═══════════════════════════════════════════════════════════');
+            throw Exception(decoded['detail']);
+          }
+        } catch (_) {
+          // ignore parse error
+        }
+        print('═══════════════════════════════════════════════════════════');
+        throw Exception(
+          'Failed to update passenger count (${response.statusCode})',
+        );
+      }
+    } catch (e, stackTrace) {
+      print('💥 EXCEPTION in updatePassengerCount:');
+      print('Error: $e');
+      print('Stack trace:');
+      print(stackTrace);
+      print('═══════════════════════════════════════════════════════════');
       rethrow;
     }
   }

@@ -71,7 +71,10 @@ class LiveBusSerializer(serializers.ModelSerializer):
                 'total_seats': obj.current_schedule.total_seats,
                 'departure_time': obj.current_schedule.departure_time,
                 'arrival_time': obj.current_schedule.arrival_time,
-                'date': obj.current_schedule.date
+                'date': obj.current_schedule.date,
+                # 👇 optional, but useful if you want live count from bus side too
+                'current_passengers': getattr(obj.current_schedule, "current_passengers", 0),
+                'last_passenger_update': obj.current_schedule.last_passenger_update,
             }
         return None
 
@@ -96,7 +99,9 @@ class ScheduleSerializer(serializers.ModelSerializer):
             'departure_time',
             'arrival_time',
             'total_seats',
-            'available_seats'
+            'available_seats',
+            'current_passengers',      # 👈 NEW
+            'last_passenger_update',   # 👈 NEW (optional but nice)
         ]
     
     def get_driver(self, obj):

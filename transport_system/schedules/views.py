@@ -289,6 +289,7 @@ def schedules_page(request):
 
 @csrf_exempt
 @api_view(["POST"])
+@authentication_classes([CsrfExemptSessionAuthentication])
 @permission_classes([IsAuthenticated])
 def update_passenger_count(request):
     """
@@ -296,15 +297,20 @@ def update_passenger_count(request):
 
     POST /api/schedules/passenger-count/
     {
-        "schedule_id": 12,
-        "count": 37
+        "schedule_id": 7,
+        "count": 12
     }
     """
     user = request.user
     schedule_id = request.data.get("schedule_id")
     count = request.data.get("count")
 
+    print("=== update_passenger_count DEBUG ===")
+    print("User:", user.id, getattr(user, "email", None))
+    print("Raw payload:", request.data)
+
     if schedule_id is None or count is None:
+        print("❌ Missing schedule_id or count")
         return Response(
             {"detail": "schedule_id and count are required."},
             status=status.HTTP_400_BAD_REQUEST,
@@ -315,6 +321,7 @@ def update_passenger_count(request):
         if count < 0:
             raise ValueError
     except ValueError:
+        print("❌ Invalid count:", count)
         return Response(
             {"detail": "Invalid count value."},
             status=status.HTTP_400_BAD_REQUEST,
@@ -325,20 +332,35 @@ def update_passenger_count(request):
         id=schedule_id,
     )
 
-    # Allow only this schedule's driver or superuser
+    print(
+        "Schedule in DB -> id:", schedule.id,
+        "| driver_id:", schedule.driver_id,
+        "| driver_email:", getattr(schedule.driver, "email", None),
+        "| old current_passengers:", getattr(schedule, "current_passengers", None),
+    )
+
+    # Only this schedule's driver or superuser
     if schedule.driver_id != user.id and not user.is_superuser:
+        print("❌ PERMISSION DENIED for user", user.id)
         return Response(
             {"detail": "Only the assigned driver can update passenger count."},
             status=status.HTTP_403_FORBIDDEN,
         )
 
+    # 👇 use your model helper (you said you have set_passenger_count)
     schedule.set_passenger_count(count)
+
+    print(
+        "✅ Passenger count updated ->",
+        "current_passengers:", getattr(schedule, "current_passengers", None),
+        "| available_seats:", getattr(schedule, "available_seats", None),
+    )
 
     return Response(
         {
             "success": True,
             "message": "Passenger count updated.",
-            "current_passengers": schedule.current_passengers,
+            "current_passengers": getattr(schedule, "current_passengers", None),
             "available_seats": getattr(schedule, "available_seats", None),
         }
     )
