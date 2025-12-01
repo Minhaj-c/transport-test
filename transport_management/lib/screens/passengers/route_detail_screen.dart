@@ -7,21 +7,16 @@ import '../../widgets/loading_widget.dart';
 import 'preinform_screen.dart';
 import 'bus_tracking_screen.dart';
 import 'package:intl/intl.dart';
-import '../../services/api_service.dart'; // 🔥 NEW
-
+import '../../services/api_service.dart'; 
 class RouteDetailScreen extends StatefulWidget {
   final BusRoute route;
-
   const RouteDetailScreen({super.key, required this.route});
-
   @override
   State<RouteDetailScreen> createState() => _RouteDetailScreenState();
 }
-
 class _RouteDetailScreenState extends State<RouteDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-
   @override
   void initState() {
     super.initState();
@@ -31,13 +26,11 @@ class _RouteDetailScreenState extends State<RouteDetailScreen>
           .loadSchedules(routeId: widget.route.id);
     });
   }
-
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -149,7 +142,7 @@ class _SchedulesTab extends StatelessWidget {
             ),
           ),
 
-          // 🔥 NEW: "Check crowd at my stop"
+          // 🔥 "Check crowd at my stop"
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: SizedBox(
@@ -234,6 +227,12 @@ class _ScheduleCard extends StatelessWidget {
     final dateFormat = DateFormat('MMM dd, yyyy');
     final statusColor = _getOccupancyColor();
 
+    // These assume your Schedule model has these fields
+    final currentStopName = schedule.currentStopName;
+    final currentStopSeq = schedule.currentStopSequence;
+    final nextStopName = schedule.nextStopName;
+    final nextStopSeq = schedule.nextStopSequence;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 3,
@@ -243,7 +242,16 @@ class _ScheduleCard extends StatelessWidget {
       ),
       child: InkWell(
         onTap: () {
-          _showBusDetails(context);
+          // 👇 NEW: open dedicated live bus screen
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => BusLiveScreen(
+                schedule: schedule,
+                route: route,
+              ),
+            ),
+          );
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
@@ -335,7 +343,43 @@ class _ScheduleCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
+
+              // 🔥 NEW: Current & next stop small summary
+              if (currentStopName != null || nextStopName != null) ...[
+                const SizedBox(height: 4),
+                if (currentStopName != null)
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on, size: 16),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Now at: $currentStopName'
+                        '${currentStopSeq != null ? " (Stop $currentStopSeq)" : ""}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.blueGrey[800],
+                        ),
+                      ),
+                    ],
+                  ),
+                if (nextStopName != null)
+                  Row(
+                    children: [
+                      const Icon(Icons.flag, size: 16),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Next: $nextStopName'
+                        '${nextStopSeq != null ? " (Stop $nextStopSeq)" : ""}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.blueGrey[800],
+                        ),
+                      ),
+                    ],
+                  ),
+                const SizedBox(height: 8),
+              ],
 
               // Seat Progress Bar
               Column(
@@ -378,148 +422,13 @@ class _ScheduleCard extends StatelessWidget {
               // Tap to view details
               Center(
                 child: Text(
-                  'Tap to view details',
+                  'Tap to view live bus status',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[600],
                     fontStyle: FontStyle.italic,
                   ),
                 ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showBusDetails(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.4,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (context, scrollController) => SingleChildScrollView(
-          controller: scrollController,
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              
-              // Bus Number
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: _getOccupancyColor().withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.directions_bus,
-                      color: _getOccupancyColor(),
-                      size: 32,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          schedule.bus.numberPlate,
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          'Route ${route.number}',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              
-              // Status Card
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: _getOccupancyColor().withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: _getOccupancyColor()),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.airline_seat_recline_normal, color: _getOccupancyColor()),
-                    const SizedBox(width: 12),
-                    Text(
-                      '${schedule.availableSeats} / ${schedule.totalSeats} Seats Available',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: _getOccupancyColor(),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              
-              // Details
-              _DetailRow(
-                icon: Icons.calendar_today,
-                label: 'Date',
-                value: DateFormat('EEEE, MMM dd, yyyy').format(schedule.date),
-              ),
-              _DetailRow(
-                icon: Icons.access_time,
-                label: 'Departure',
-                value: schedule.departureTime,
-              ),
-              _DetailRow(
-                icon: Icons.access_time_filled,
-                label: 'Arrival',
-                value: schedule.arrivalTime,
-              ),
-              _DetailRow(
-                icon: Icons.person,
-                label: 'Driver',
-                value: schedule.driverName,
-              ),
-              _DetailRow(
-                icon: Icons.straighten,
-                label: 'Distance',
-                value: route.distanceInfo,
-              ),
-              _DetailRow(
-                icon: Icons.schedule,
-                label: 'Duration',
-                value: route.durationInfo,
               ),
             ],
           ),
@@ -1080,4 +989,271 @@ void _showLiveStatusBottomSheet(
       );
     },
   );
+}
+
+/// 🔥 NEW: Dedicated screen for live status of one bus (one schedule)
+class BusLiveScreen extends StatelessWidget {
+  final Schedule schedule;
+  final BusRoute route;
+
+  const BusLiveScreen({
+    super.key,
+    required this.schedule,
+    required this.route,
+  });
+
+  Color _getOccupancyColor() {
+    final occupancyRate = schedule.occupancyRate;
+    if (schedule.availableSeats == 0) return Colors.grey;
+    if (occupancyRate >= 80) return Colors.red;
+    if (occupancyRate >= 50) return Colors.orange;
+    return Colors.green;
+  }
+
+  String _getOccupancyStatus() {
+    final occupancyRate = schedule.occupancyRate;
+    if (schedule.availableSeats == 0) return 'FULL';
+    if (occupancyRate >= 80) return 'ALMOST FULL';
+    if (occupancyRate >= 50) return 'FILLING UP';
+    return 'COMFORTABLE';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dateFormat = DateFormat('EEEE, MMM dd, yyyy');
+    final statusColor = _getOccupancyColor();
+
+    final currentStopName = schedule.currentStopName;
+    final currentStopSeq = schedule.currentStopSequence;
+    final nextStopName = schedule.nextStopName;
+    final nextStopSeq = schedule.nextStopSequence;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Bus ${schedule.bus.numberPlate}'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.map),
+            onPressed: () {
+              // Reuse main tracking screen but for this route
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => BusTrackingScreen(route: route),
+                ),
+              );
+            },
+            tooltip: 'View on map',
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Status card
+            Card(
+              elevation: 3,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: statusColor, width: 2),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.directions_bus,
+                            color: statusColor,
+                            size: 32,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                schedule.bus.numberPlate,
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                'Route ${route.number}: ${route.origin} → ${route.destination}',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _getOccupancyStatus(),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: statusColor,
+                          ),
+                        ),
+                        Text(
+                          '${schedule.occupiedSeats}/${schedule.totalSeats} seats used',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: LinearProgressIndicator(
+                        value: schedule.occupiedSeats / schedule.totalSeats,
+                        backgroundColor: Colors.grey[200],
+                        valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                        minHeight: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Where is the bus now
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Live position',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    if (currentStopName == null && nextStopName == null)
+                      const Text(
+                        'Driver has not updated current stop yet.',
+                        style: TextStyle(fontSize: 13, color: Colors.grey),
+                      )
+                    else ...[
+                      if (currentStopName != null)
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.location_on, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Now at: $currentStopName'
+                                '${currentStopSeq != null ? " (Stop $currentStopSeq)" : ""}',
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ),
+                          ],
+                        ),
+                      if (nextStopName != null) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.flag, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Next: $nextStopName'
+                                '${nextStopSeq != null ? " (Stop $nextStopSeq)" : ""}',
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                    const SizedBox(height: 12),
+                    Text(
+                      'Last passenger update: '
+                      '${schedule.lastPassengerUpdate != null ? DateFormat.Hm().format(schedule.lastPassengerUpdate!) : "—"}',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Schedule basic details
+            Card(
+              elevation: 1,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    _DetailRow(
+                      icon: Icons.calendar_today,
+                      label: 'Date',
+                      value: dateFormat.format(schedule.date),
+                    ),
+                    _DetailRow(
+                      icon: Icons.access_time,
+                      label: 'Departure',
+                      value: schedule.departureTime,
+                    ),
+                    _DetailRow(
+                      icon: Icons.access_time_filled,
+                      label: 'Arrival',
+                      value: schedule.arrivalTime,
+                    ),
+                    _DetailRow(
+                      icon: Icons.person,
+                      label: 'Driver',
+                      value: schedule.driverName,
+                    ),
+                    _DetailRow(
+                      icon: Icons.straighten,
+                      label: 'Distance',
+                      value: route.distanceInfo,
+                    ),
+                    _DetailRow(
+                      icon: Icons.schedule,
+                      label: 'Duration',
+                      value: route.durationInfo,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

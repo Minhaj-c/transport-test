@@ -6,6 +6,8 @@ Convert Bus and Schedule models to JSON
 from rest_framework import serializers
 from .models import Bus, Schedule, BusSchedule
 from routes.serializers import RouteSerializer
+from routes.models import Stop
+
 
 
 class BusSerializer(serializers.ModelSerializer):
@@ -87,6 +89,10 @@ class ScheduleSerializer(serializers.ModelSerializer):
     route = RouteSerializer(read_only=True)
     bus = BusSerializer(read_only=True)
     driver = serializers.SerializerMethodField()
+    current_stop_sequence = serializers.IntegerField(read_only=True)
+    current_stop_name = serializers.SerializerMethodField()
+    next_stop_sequence = serializers.SerializerMethodField()
+    next_stop_name = serializers.SerializerMethodField()
     
     class Meta:
         model = Schedule
@@ -103,6 +109,9 @@ class ScheduleSerializer(serializers.ModelSerializer):
             'current_passengers',    
             'last_passenger_update', 
             'current_stop_sequence',  
+            "current_stop_name",
+            "next_stop_sequence",
+            "next_stop_name",
         ]
     
     def get_driver(self, obj):
@@ -112,6 +121,48 @@ class ScheduleSerializer(serializers.ModelSerializer):
             'name': f"{obj.driver.first_name} {obj.driver.last_name}".strip() or obj.driver.email,
             'email': obj.driver.email
         }
+    def _get_stops_for_route(self, obj):
+        """
+        Small helper: all stops for this route ordered by sequence.
+        """
+        if not obj.route_id:
+            return Stop.objects.none()
+        return obj.route.stops.all().order_by("sequence")
+
+    def get_current_stop_name(self, obj):
+        """
+        Returns the current stop name based on current_stop_sequence.
+        """
+        seq = getattr(obj, "current_stop_sequence", None)
+        if not seq:
+            return None
+
+        stop = self._get_stops_for_route(obj).filter(sequence=seq).first()
+        return stop.name if stop else None
+
+    def get_next_stop_sequence(self, obj):
+        """
+        Next stop sequence after current_stop_sequence (if any).
+        """
+        seq = getattr(obj, "current_stop_sequence", None)
+        if not seq:
+            return None
+
+        qs = self._get_stops_for_route(obj).filter(sequence__gt=seq).order_by("sequence")
+        next_stop = qs.first()
+        return next_stop.sequence if next_stop else None
+
+    def get_next_stop_name(self, obj):
+        """
+        Next stop name after current_stop_sequence (if any).
+        """
+        seq = getattr(obj, "current_stop_sequence", None)
+        if not seq:
+            return None
+
+        qs = self._get_stops_for_route(obj).filter(sequence__gt=seq).order_by("sequence")
+        next_stop = qs.first()
+        return next_stop.name if next_stop else None    
 
 
 class BusScheduleSerializer(serializers.ModelSerializer):

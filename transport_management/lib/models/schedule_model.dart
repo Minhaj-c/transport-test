@@ -13,13 +13,20 @@ class Schedule {
   final int availableSeats;
 
   // Nullable values coming from backend
-  final int? currentPassengers;         
-  final DateTime? lastPassengerUpdate;  
-  final bool? isRunning;                
-  final String? nextStopName;           
-  final int? overflowLoad;              
-  final int? maxLoad;         
-  final int? currentStopSequence;          
+  final int? currentPassengers;
+  final DateTime? lastPassengerUpdate;
+  final bool? isRunning; // (may be null if backend doesn't send it)
+  final String? nextStopNameLegacy; // legacy field if backend ever used it
+
+  // Prediction / extra info (may be null)
+  final int? overflowLoad;
+  final int? maxLoad;
+
+  // 🔥 NEW – live stop fields from backend ScheduleSerializer
+  final int? currentStopSequence;
+  final String? currentStopName;
+  final int? nextStopSequence;
+  final String? nextStopName;
 
   Schedule({
     required this.id,
@@ -34,10 +41,13 @@ class Schedule {
     this.currentPassengers,
     this.lastPassengerUpdate,
     this.isRunning,
-    this.nextStopName,
+    this.nextStopNameLegacy,
     this.overflowLoad,
     this.maxLoad,
     this.currentStopSequence,
+    this.currentStopName,
+    this.nextStopSequence,
+    this.nextStopName,
   });
 
   factory Schedule.fromJson(Map<String, dynamic> json) {
@@ -54,29 +64,34 @@ class Schedule {
     }
 
     return Schedule(
-      id: json['id'],
-      route: BusRoute.fromJson(json['route']),
-      bus: Bus.fromJson(json['bus']),
-      driver: json['driver'] ?? const {},
-      date: DateTime.parse(json['date']),
-      departureTime: json['departure_time'],
-      arrivalTime: json['arrival_time'],
-      totalSeats: json['total_seats'],
-      availableSeats: json['available_seats'],
+      id: json['id'] as int,
+      route: BusRoute.fromJson(json['route'] as Map<String, dynamic>),
+      bus: Bus.fromJson(json['bus'] as Map<String, dynamic>),
+      driver: (json['driver'] as Map<String, dynamic>?) ?? const {},
+      date: DateTime.parse(json['date'] as String),
+      departureTime: json['departure_time'] as String,
+      arrivalTime: json['arrival_time'] as String,
+      totalSeats: json['total_seats'] as int,
+      availableSeats: json['available_seats'] as int,
 
       // Optional fields
-      currentPassengers: json['current_passengers'],
+      currentPassengers: json['current_passengers'] as int?,
       lastPassengerUpdate: lastUpdate,
-      isRunning: json['is_running'],
-      nextStopName: json['next_stop_name'],
-      overflowLoad: json['overflow_load'],
-      maxLoad: json['max_load'],
-       currentStopSequence: json['current_stop_sequence'],
+      isRunning: json['is_running'] as bool?,
+      nextStopNameLegacy: json['next_stop_name'] as String?, // legacy
+
+      overflowLoad: json['overflow_load'] as int?,
+      maxLoad: json['max_load'] as int?,
+
+      // 🔥 Live-stop fields (same keys as ScheduleSerializer)
+      currentStopSequence: json['current_stop_sequence'] as int?,
+      currentStopName: json['current_stop_name'] as String?,
+      nextStopSequence: json['next_stop_sequence'] as int?,
+      nextStopName: json['next_stop_name'] as String?,
     );
   }
 
   // 👉 Always gives a safe, non-null number.
-  // Uses backend live passengers if present else fallback.
   int get livePassengers {
     if (currentPassengers != null) {
       return currentPassengers!;
