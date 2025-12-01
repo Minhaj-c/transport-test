@@ -95,8 +95,10 @@ def generate_preinform_alerts(for_date=None, zone=None):
 def compute_bus_load_for_schedule(schedule):
     """
     For ONE schedule:
-    - Start from schedule.current_passengers
+    - Start from schedule.current_passengers (current load inside bus)
     - Add NOTED pre-informs per stop (for this route + date)
+    - If driver has set current_stop_sequence, only consider
+      stops with sequence > current_stop_sequence (future stops).
     - Return per-stop expected load, max load and first overflow stop
     """
 
@@ -109,12 +111,21 @@ def compute_bus_load_for_schedule(schedule):
         or getattr(schedule.bus, "capacity", None)
     )
 
+    # Passengers already inside the bus *now*
     base = schedule.current_passengers or 0
 
-    # All stops in order
-    stops = list(
-        Stop.objects.filter(route=route).order_by("sequence")
-    )
+    # ---------------------------------------------
+    # KEY CHANGE: only look at FUTURE stops
+    # ---------------------------------------------
+    current_seq = getattr(schedule, "current_stop_sequence", None)
+    if current_seq is None:
+        current_seq = 0
+
+    # All stops in order; if bus already started, keep only stops after it
+    stops_qs = Stop.objects.filter(route=route).order_by("sequence")
+    if current_seq:
+        stops_qs = stops_qs.filter(sequence__gt=current_seq)
+    stops = list(stops_qs)
 
     # NOTED pre-informs for this route + date
     pis = PreInform.objects.filter(
