@@ -12,7 +12,7 @@ from schedules.models import Schedule, Bus
 from routes.models import Route, Stop
 from demand.models import DemandAlert
 
-# Alert engines
+# Alert engines – ONLY these (❌ no build_prediction_alerts_for_ui)
 from zonaladmin.logic.alert_engine import (
     generate_demand_alerts,
     generate_prediction_alerts,
@@ -366,14 +366,11 @@ def assign_bus_view(request):
 @login_required
 def zonal_demand_alerts(request):
     """
-    Demand alerts page:
-      - Uses NOTED pre-informs + predictions
-      - Split into two tables (Pre-Inform based & Prediction based)
-      - Allows dispatching spare buses (prediction section)
+    Demand alerts page with schedule lookup for prediction alerts
     """
     user = request.user
 
-    # --- Date filter (optional, default = today) ---
+    # Date filter
     date_str = request.GET.get("date")
     if date_str:
         try:
@@ -383,18 +380,16 @@ def zonal_demand_alerts(request):
     else:
         selected_date = timezone.localdate()
 
-    # Determine zone (for zonal admins only)
+    # Zone filter
     zone = None
     if getattr(user, "role", None) == "zonal_admin" and getattr(user, "zone_id", None):
         zone = user.zone
 
-    # 1) Classical demand from NOTED pre-informs
+    # Generate alerts
     generate_demand_alerts(for_date=selected_date, zone=zone)
-
-    # 2) Prediction-based alerts using running buses + preinforms
     generate_prediction_alerts(for_date=selected_date, zone=zone)
 
-    # 3) Load alerts only for this date (+ zone via filter_zone)
+    # Load alerts
     base_qs = (
         DemandAlert.objects.select_related("stop", "stop__route", "user")
         .filter(created_at__date=selected_date)
@@ -403,20 +398,35 @@ def zonal_demand_alerts(request):
 
     base_qs = filter_zone(base_qs, user)
 
-    # Split into 2 groups based on admin_notes
+    # Split alerts
     preinform_alerts = base_qs.filter(admin_notes__icontains="Pre-Informs")
     prediction_alerts = base_qs.filter(admin_notes__icontains="Prediction (Bus load)")
+
+    # 🔥 NEW: Find the schedule for each prediction alert
+    prediction_alerts_with_schedule = []
+    for alert in prediction_alerts:
+        # Find running schedule on this route for this date
+        schedule = Schedule.objects.filter(
+            route=alert.stop.route,
+            date=selected_date,
+            bus__is_running=True
+        ).select_related('bus', 'driver').first()
+
+        prediction_alerts_with_schedule.append({
+            'alert': alert,
+            'bus_schedule': schedule,
+            'level': alert.get_level()
+        })
 
     context = {
         "user": user,
         "selected_date": selected_date,
         "preinform_alerts": preinform_alerts,
-        "prediction_alerts": prediction_alerts,
+        "prediction_alerts": prediction_alerts,  # Keep for count
+        "prediction_alerts_with_schedule": prediction_alerts_with_schedule,  # NEW
     }
 
     return render(request, "zonaladmin/demand.html", context)
-
-
 # --------------------------
 # 6b) DISPATCH SPARE BUS FROM ALERT
 # --------------------------

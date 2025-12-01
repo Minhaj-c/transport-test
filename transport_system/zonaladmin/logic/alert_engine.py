@@ -288,6 +288,8 @@ def generate_demand_alerts(for_date=None, zone=None):
     pre = generate_preinform_alerts(for_date=for_date, zone=zone)
     pred = generate_prediction_alerts(for_date=for_date, zone=zone)
     return pre + pred
+
+
 def get_overflow_warnings_for_schedule(schedule):
     """
     Backwards-compatible helper so old imports keep working.

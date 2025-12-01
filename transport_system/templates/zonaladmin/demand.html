@@ -249,7 +249,6 @@
 
         .nowrap { white-space: nowrap; }
 
-        /* NEW: small button for spare bus action */
         .btn-small {
             display: inline-block;
             padding: 4px 10px;
@@ -326,14 +325,12 @@
 
     <div class="legend">
         <span><span class="badge badge-level-normal">Normal</span> 0–9 people</span>
-        <span><span class="badge badge-level-medium">Medium</span> 10–19 people</span>
-        <span><span class="badge badge-level-high">High</span> 20–49 people</span>
+        <span><span class="badge badge-level-medium">Medium</span> 10–24 people</span>
+        <span><span class="badge badge-level-high">High</span> 25–49 people</span>
         <span><span class="badge badge-level-critical">Critical</span> 50+ people</span>
     </div>
 
-    <!-- =======================
-         SECTION 1: PRE-INFORM DEMAND
-         ======================= -->
+    <!-- PRE-INFORM DEMAND -->
     <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <div class="pill">
@@ -342,7 +339,6 @@
             </div>
             <span class="muted">
                 People = passengers who plan to <strong>board at that stop</strong>.
-                Use this to add trips or bigger buses.
             </span>
         </div>
 
@@ -352,10 +348,9 @@
                 <th>#</th>
                 <th>Stop</th>
                 <th>Route</th>
-                <th>People waiting</th>
+                <th>People</th>
                 <th>Level</th>
                 <th>Status</th>
-                <th>Source</th>
                 <th>Created</th>
             </tr>
             </thead>
@@ -364,51 +359,37 @@
                 {% for alert in preinform_alerts %}
                     {% with level=alert.get_level %}
                     <tr>
-                        <td class="nowrap">{{ forloop.counter }}</td>
+                        <td>{{ forloop.counter }}</td>
                         <td>
-                            <div>{{ alert.stop.name }}</div>
-                            <div class="muted-small">
-                                Stop sequence: #{{ alert.stop.sequence }}
-                            </div>
+                            {{ alert.stop.name }}
+                            <div class="muted-small">Stop #{{ alert.stop.sequence }}</div>
                         </td>
                         <td>
                             {% if alert.stop.route %}
                                 {{ alert.stop.route.number }} – {{ alert.stop.route.name }}
                             {% else %}
-                                <span class="muted">No route linked</span>
+                                <span class="muted">No route</span>
                             {% endif %}
                         </td>
                         <td>{{ alert.number_of_people }}</td>
                         <td>
-                            <span class="badge
-                                {% if level == 'normal' %}badge-level-normal{% endif %}
-                                {% if level == 'medium' %}badge-level-medium{% endif %}
-                                {% if level == 'high' %}badge-level-high{% endif %}
-                                {% if level == 'critical' %}badge-level-critical{% endif %}
-                            ">
+                            <span class="badge badge-level-{{ level }}">
                                 {{ level|title }}
                             </span>
                         </td>
                         <td>
-                            <span class="badge
-                                {% if alert.status == 'reported' %}badge-status-reported{% endif %}
-                                {% if alert.status == 'verified' %}badge-status-verified{% endif %}
-                                {% if alert.status == 'dispatched' %}badge-status-dispatched{% endif %}
-                                {% if alert.status == 'resolved' %}badge-status-resolved{% endif %}
-                                {% if alert.status == 'expired' %}badge-status-expired{% endif %}
-                            ">
+                            <span class="badge badge-status-{{ alert.status }}">
                                 {{ alert.get_status_display }}
                             </span>
                         </td>
-                        <td><span class="muted">System (Pre-Informs)</span></td>
                         <td class="nowrap">{{ alert.created_at|date:"Y-m-d H:i" }}</td>
                     </tr>
                     {% endwith %}
                 {% endfor %}
             {% else %}
                 <tr>
-                    <td colspan="8" class="muted">
-                        No pre-inform based demand alerts for this date.
+                    <td colspan="7" class="muted">
+                        No pre-inform alerts for this date.
                     </td>
                 </tr>
             {% endif %}
@@ -416,18 +397,15 @@
         </table>
     </div>
 
-    <!-- =======================
-         SECTION 2: BUS OVERLOAD PREDICTIONS
-         ======================= -->
+    <!-- BUS OVERLOAD PREDICTIONS -->
     <div class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
             <div class="pill" style="background:#fef3c7; color:#92400e;">
                 <span class="pill-dot" style="background:#f97316;"></span>
-                Bus overflow predictions (running buses)
+                Bus overflow predictions
             </div>
             <span class="muted">
-                Expected load = passengers <strong>inside the bus after this stop</strong>.
-                Compare with capacity to decide spare buses.
+                Expected load = passengers <strong>inside bus after this stop</strong>.
             </span>
         </div>
 
@@ -435,129 +413,70 @@
             <thead>
             <tr>
                 <th>#</th>
-                <th>Alert stop</th>
+                <th>Alert Stop</th>
                 <th>Route</th>
-                <th>Bus / now</th>
-                <th>Expected load</th>
+                <th>Bus / Now</th>
+                <th>Expected Load</th>
                 <th>Level</th>
-                <th>Summary</th>
                 <th>Status</th>
                 <th>Created</th>
-                <th>Action</th> <!-- NEW COLUMN -->
+                <th>Action</th>
             </tr>
             </thead>
             <tbody>
             {% if prediction_alerts %}
-                {% for alert in prediction_alerts %}
-                    {% with level=alert.get_level %}
-                    {% with bus_schedule=alert.schedule %}
+                {% for alert in prediction_alerts_with_schedule %}
+                    {% with level=alert.level %}
+                    {% with schedule=alert.bus_schedule %}
                     <tr>
-                        <td class="nowrap">{{ forloop.counter }}</td>
+                        <td>{{ forloop.counter }}</td>
 
                         <td>
-                            <div>{{ alert.stop.name }}</div>
-                            <div class="muted-small">Alert at stop #{{ alert.stop.sequence }}</div>
+                            {{ alert.alert.stop.name }}
+                            <div class="muted-small">Stop #{{ alert.alert.stop.sequence }}</div>
                         </td>
 
                         <td>
-                            {% if alert.stop.route %}
-                                {{ alert.stop.route.number }} – {{ alert.stop.route.name }}
-                            {% else %}
-                                <span class="muted">No route linked</span>
-                            {% endif %}
+                            {{ alert.alert.stop.route.number }} – {{ alert.alert.stop.route.name }}
                         </td>
 
                         <td>
-                            {% if bus_schedule %}
-                                <div class="nowrap">
-                                    Bus: {{ bus_schedule.bus.number_plate }}
-                                </div>
+                            {% if schedule %}
+                                <div class="nowrap">Bus: {{ schedule.bus.number_plate }}</div>
                                 <div class="muted-small">
-                                    Now at stop #
-                                    {% if bus_schedule.current_stop_sequence %}
-                                        {{ bus_schedule.current_stop_sequence }}
-                                    {% else %}
-                                        –
-                                    {% endif %}
-                                    {% if bus_schedule.current_passengers is not None %}
-                                        · Current load:
-                                        {{ bus_schedule.current_passengers }}
-                                        {% if bus_schedule.bus.capacity %}
-                                            / {{ bus_schedule.bus.capacity }}
-                                        {% endif %}
-                                    {% endif %}
+                                    Stop #{{ schedule.current_stop_sequence|default:"—" }}
+                                    · Load: {{ schedule.current_passengers|default:0 }}/{{ schedule.bus.capacity }}
                                 </div>
                             {% else %}
-                                <span class="muted-small">
-                                    Bus / current stop info not available  
-                                    (check if driver started trip & set current stop in app).
-                                </span>
+                                <span class="muted-small">No running bus found</span>
                             {% endif %}
                         </td>
 
                         <td>
-                            <div>
-                                {{ alert.number_of_people }}
-                                {% if bus_schedule and bus_schedule.bus.capacity %}
-                                    / {{ bus_schedule.bus.capacity }}
-                                {% endif %}
-                            </div>
-                            <div class="muted-small">
-                                Predicted load after this stop
-                                {% if alert.over_capacity %}
-                                    ({{ alert.over_capacity }} over)
-                                {% endif %}
-                            </div>
+                            {{ alert.alert.number_of_people }}
+                            {% if schedule %}
+                                / {{ schedule.bus.capacity }}
+                            {% endif %}
                         </td>
 
                         <td>
-                            <span class="badge
-                                {% if level == 'normal' %}badge-level-normal{% endif %}
-                                {% if level == 'medium' %}badge-level-medium{% endif %}
-                                {% if level == 'high' %}badge-level-high{% endif %}
-                                {% if level == 'critical' %}badge-level-critical{% endif %}
-                            ">
+                            <span class="badge badge-level-{{ level }}">
                                 {{ level|title }}
                             </span>
                         </td>
 
                         <td>
-                            {% if bus_schedule %}
-                                <div class="muted-small">
-                                    Route {{ alert.stop.route.number }},
-                                    bus {{ bus_schedule.bus.number_plate }}
-                                    will have {{ alert.number_of_people }} passengers
-                                    after {{ alert.stop.name }}.
-                                    {% if bus_schedule.bus.capacity %}
-                                        Capacity {{ bus_schedule.bus.capacity }}.
-                                    {% endif %}
-                                    {% if alert.over_capacity %}
-                                        Over by {{ alert.over_capacity }} → 
-                                        consider spare bus from this stop.
-                                    {% else %}
-                                        Monitor, but no overflow yet.
-                                    {% endif %}
-                                </div>
-                            {% else %}
-                                <div class="muted-small">
-                                    Prediction without linked bus – check schedule assignment.
-                                </div>
-                            {% endif %}
-                        </td>
-
-                        <td>
-                            <span class="badge badge-status-reported">
-                                {{ alert.get_status_display }}
+                            <span class="badge badge-status-{{ alert.alert.status }}">
+                                {{ alert.alert.get_status_display }}
                             </span>
                         </td>
 
-                        <td class="nowrap">{{ alert.created_at|date:"Y-m-d H:i" }}</td>
+                        <td class="nowrap">{{ alert.alert.created_at|date:"Y-m-d H:i" }}</td>
 
-                        <!-- NEW ACTION CELL -->
                         <td>
                             {% if level == 'high' or level == 'critical' %}
-                                <a href="{% url 'zonal-dispatch-spare' alert.id %}" class="btn-small">
-                                    Dispatch spare bus
+                                <a href="{% url 'zonal-dispatch-spare' alert.alert.id %}" class="btn-small">
+                                    Dispatch
                                 </a>
                             {% else %}
                                 <span class="muted-small">Monitor</span>
@@ -569,7 +488,7 @@
                 {% endfor %}
             {% else %}
                 <tr>
-                    <td colspan="10" class="muted">
+                    <td colspan="9" class="muted">
                         No overflow predictions for this date.
                     </td>
                 </tr>
