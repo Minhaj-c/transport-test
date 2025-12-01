@@ -10,20 +10,58 @@
             box-shadow:0 2px 5px rgba(0,0,0,0.2);
         }
         .header h2 { margin:0; }
-        .header a { color:#dbe7ff; text-decoration:none; margin-left:16px; font-size:14px; }
+        .header a {
+            color:#dbe7ff; text-decoration:none; margin-left:16px; font-size:14px;
+        }
+        .header a:hover { text-decoration:underline; }
+
         .container { width:90%; margin:25px auto 40px; }
         .card {
             background:#ffffff; padding:18px 20px; border-radius:10px;
             box-shadow:0px 3px 8px rgba(0,0,0,0.12);
         }
-        table { width:100%; border-collapse:collapse; margin-top:10px; border-radius:8px; overflow:hidden; }
-        th { background:#dfe4ea; padding:10px; text-align:left; font-size:13px; }
-        td { padding:9px 10px; border-bottom:1px solid #e3e3e3; font-size:13px; background:#fff; }
+
+        table { width:100%; border-collapse:collapse; margin-top:10px;
+                border-radius:8px; overflow:hidden; }
+        th {
+            background:#dfe4ea; padding:10px; text-align:left; font-size:13px;
+        }
+        td {
+            padding:9px 10px; border-bottom:1px solid #e3e3e3; font-size:13px;
+            background:#fff;
+        }
         tr:hover td { background:#f7f9fc; }
+
         .btn-primary {
             display:inline-block; padding:8px 14px; border-radius:6px;
-            text-decoration:none; background:#0275d8; color:white; font-size:13px;
-            margin-bottom:10px;
+            text-decoration:none; background:#0275d8; color:white;
+            font-size:13px; margin-bottom:10px;
+        }
+
+        /* Trip-type pill */
+        .tag {
+            display:inline-block;
+            padding:4px 10px;
+            font-size:11px;
+            border-radius:999px;
+            border:1px solid transparent;
+            white-space:nowrap;
+        }
+        .tag-regular {
+            border-color:#d1d5db;
+            background:#f9fafb;
+            color:#374151;
+        }
+        .tag-spare {
+            border-color:#f97316;
+            background:#fffbeb;
+            color:#c2410c;
+            font-weight:600;
+        }
+        .tag-spare small {
+            font-weight:400;
+            font-size:10px;
+            opacity:0.8;
         }
     </style>
 </head>
@@ -34,10 +72,7 @@
     <div>
         <a href="/zonal-admin/">Dashboard</a>
         <a href="/zonal-admin/preinforms/">Pre-Informs</a>
-        <a href="/zonal-admin/routes/">Routes</a>
-        <a href="{% url 'schedule-load-prediction' schedule.id %}">
-        View Load
-    </a>
+        <a href="/zonal-admin/demand/">Demand Alerts</a>
     </div>
 </div>
 
@@ -52,6 +87,8 @@
                 <th>Date</th>
                 <th>Departure</th>
                 <th>Arrival</th>
+                <th>Driver</th>
+                <th>Trip Type</th>
             </tr>
 
             {% for s in schedules %}
@@ -61,9 +98,22 @@
                 <td>{{ s.date }}</td>
                 <td>{{ s.departure_time }}</td>
                 <td>{{ s.arrival_time }}</td>
+                <td>{{ s.driver.email }}</td>
+                <td>
+                    {% if s.is_spare_trip %}
+                        <span class="tag tag-spare">
+                            Spare bus
+                            {% if s.source_alert %}
+                                <small>(from alert #{{ s.source_alert.id }})</small>
+                            {% endif %}
+                        </span>
+                    {% else %}
+                        <span class="tag tag-regular">Regular trip</span>
+                    {% endif %}
+                </td>
             </tr>
             {% empty %}
-            <tr><td colspan="5">No schedules defined.</td></tr>
+            <tr><td colspan="7">No schedules defined.</td></tr>
             {% endfor %}
         </table>
     </div>

@@ -248,6 +248,22 @@
         }
 
         .nowrap { white-space: nowrap; }
+
+        /* NEW: small button for spare bus action */
+        .btn-small {
+            display: inline-block;
+            padding: 4px 10px;
+            font-size: 11px;
+            border-radius: 999px;
+            border: 1px solid #2563eb;
+            background: #2563eb;
+            color: #ffffff;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .btn-small:hover {
+            background: #1d4ed8;
+        }
     </style>
 </head>
 <body>
@@ -280,6 +296,10 @@
                 <strong>{{ selected_date|date:"Y-m-d" }}</strong>.  
                 Top section = <strong>people waiting at stops</strong>.  
                 Bottom section = <strong>people inside buses after each stop</strong>.
+                <br>
+                <span class="muted">
+                    For <strong>High / Critical</strong> predictions, you can dispatch a spare bus.
+                </span>
             </p>
 
             <div style="margin-top:4px;">
@@ -423,13 +443,14 @@
                 <th>Summary</th>
                 <th>Status</th>
                 <th>Created</th>
+                <th>Action</th> <!-- NEW COLUMN -->
             </tr>
             </thead>
             <tbody>
             {% if prediction_alerts %}
                 {% for alert in prediction_alerts %}
                     {% with level=alert.get_level %}
-                    {% with bus_schedule=alert.schedule|default:alert.derived_schedule %}
+                    {% with bus_schedule=alert.schedule %}
                     <tr>
                         <td class="nowrap">{{ forloop.counter }}</td>
 
@@ -531,13 +552,24 @@
                         </td>
 
                         <td class="nowrap">{{ alert.created_at|date:"Y-m-d H:i" }}</td>
+
+                        <!-- NEW ACTION CELL -->
+                        <td>
+                            {% if level == 'high' or level == 'critical' %}
+                                <a href="{% url 'zonal-dispatch-spare' alert.id %}" class="btn-small">
+                                    Dispatch spare bus
+                                </a>
+                            {% else %}
+                                <span class="muted-small">Monitor</span>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endwith %}
                     {% endwith %}
                 {% endfor %}
             {% else %}
                 <tr>
-                    <td colspan="9" class="muted">
+                    <td colspan="10" class="muted">
                         No overflow predictions for this date.
                     </td>
                 </tr>

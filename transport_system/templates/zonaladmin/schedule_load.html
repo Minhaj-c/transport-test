@@ -241,9 +241,9 @@
                         <td>
                             {% if load > data.capacity %}
                                 <span class="badge badge-danger">
-                                    Over by {{ load|add:-data.capacity }}
+                                    Over capacity
                                 </span>
-                            {% elif load >= data.capacity|add:'-5' %}
+                            {% elif load|add:"5" >= data.capacity %}
                                 <span class="badge badge-warn">
                                     Nearly full
                                 </span>

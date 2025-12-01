@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Demand Alerts</title>
+    <meta charset="UTF-8">
+    <title>Routes – Zonal Admin</title>
     <style>
         body { font-family:Arial, sans-serif; margin:0; background:#eef1f7; }
         .header {
@@ -9,7 +10,7 @@
             display:flex; justify-content:space-between; align-items:center;
             box-shadow:0 2px 5px rgba(0,0,0,0.2);
         }
-        .header h2 { margin:0; }
+        .header h2 { margin:0; font-size:18px; }
         .header a { color:#dbe7ff; text-decoration:none; margin-left:16px; font-size:14px; }
         .container { width:90%; margin:25px auto 40px; }
         .card {
@@ -17,23 +18,25 @@
             box-shadow:0px 3px 8px rgba(0,0,0,0.12);
         }
         table { width:100%; border-collapse:collapse; margin-top:10px; border-radius:8px; overflow:hidden; }
-        th { background:#dfe4ea; padding:10px; text-align:left; font-size:13px; }
+        th { background:#dfe4ea; padding:10px; text-align:left; font-size:13px; text-transform:uppercase; letter-spacing:.03em; }
         td { padding:9px 10px; border-bottom:1px solid #e3e3e3; font-size:13px; background:#fff; }
-        tr:hover td { background:#f7f9fc; }
-        .badge { padding:3px 7px; border-radius:4px; font-size:11px; }
-        .badge-active { background:#ffeeba; color:#856404; }
-        .badge-expired { background:#f8d7da; color:#721c24; }
-        .badge-resolved { background:#d4edda; color:#155724; }
+        tr:nth-child(even) td { background:#f7f9fc; }
+        tr:hover td { background:#edf2ff; }
+        .badge {
+            padding:3px 8px; border-radius:999px; font-size:11px;
+            background:#e5e7eb; color:#374151;
+        }
     </style>
 </head>
 <body>
 
 <div class="header">
-    <h2>Demand Alerts – {{ user.zone.name|default:"All Zones" }}</h2>
+    <h2>Routes – Zonal Admin</h2>
     <div>
         <a href="/zonal-admin/">Dashboard</a>
         <a href="/zonal-admin/preinforms/">Pre-Informs</a>
-        <a href="/zonal-admin/routes/">Routes</a>
+        <a href="/zonal-admin/schedules/">Schedules</a>
+        <a href="/zonal-admin/demand/">Demand Alerts</a>
     </div>
 </div>
 
@@ -41,37 +44,25 @@
     <div class="card">
         <table>
             <tr>
-                <th>Reported By</th>
-                <th>Stop</th>
-                <th>People</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th>Expires</th>
+                <th>#</th>
+                <th>Route Number</th>
+                <th>Route Name</th>
+                <th>Total Stops</th>
             </tr>
 
-            {% for d in alerts %}
+            {% for r in routes %}
             <tr>
-                <td>{{ d.user.email }}</td>
-                <td>{{ d.stop.name }}</td>
-                <td>{{ d.number_of_people }}</td>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ r.number }}</td>
+                <td>{{ r.name }}</td>
                 <td>
-                    <span class="badge
-                        {% if d.status == 'reported' or d.status == 'verified' or d.status == 'dispatched' %}
-                            badge-active
-                        {% elif d.status == 'resolved' %}
-                            badge-resolved
-                        {% else %}
-                            badge-expired
-                        {% endif %}
-                    ">
-                        {{ d.status|title }}
+                    <span class="badge">
+                        {{ r.stop_count }} stop{% if r.stop_count != 1 %}s{% endif %}
                     </span>
                 </td>
-                <td>{{ d.created_at }}</td>
-                <td>{{ d.expires_at }}</td>
             </tr>
             {% empty %}
-            <tr><td colspan="6">No demand alerts.</td></tr>
+            <tr><td colspan="4">No routes defined.</td></tr>
             {% endfor %}
         </table>
     </div>

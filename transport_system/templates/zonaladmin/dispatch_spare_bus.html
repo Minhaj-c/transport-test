@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dispatch Spare Bus – Zonal Admin</title>
+    <style>
+        :root {
+            --bg-page: #f3f4f6;
+            --bg-card: #ffffff;
+            --border-soft: #e5e7eb;
+            --text-main: #111827;
+            --text-muted: #6b7280;
+            --accent: #2563eb;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            margin: 0;
+            background: var(--bg-page);
+            color: var(--text-main);
+        }
+
+        .page {
+            width: 96%;
+            max-width: 700px;
+            margin: 24px auto 40px;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: 10px;
+            border: 1px solid var(--border-soft);
+            padding: 16px 18px;
+            box-shadow: 0 1px 3px rgba(15,23,42,0.06);
+            margin-bottom: 16px;
+        }
+
+        .title {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0 0 6px;
+        }
+
+        .subtitle {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin: 0 0 12px;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px 16px;
+            font-size: 13px;
+        }
+
+        .label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+            color: var(--text-muted);
+        }
+
+        .value {
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        form .field {
+            margin-bottom: 12px;
+        }
+
+        form label {
+            display: block;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-bottom: 3px;
+        }
+
+        form select,
+        form input[type="date"],
+        form input[type="time"] {
+            width: 100%;
+            padding: 6px 8px;
+            font-size: 13px;
+            border-radius: 6px;
+            border: 1px solid var(--border-soft);
+        }
+
+        .actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .btn {
+            border-radius: 999px;
+            padding: 6px 14px;
+            font-size: 13px;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: #ffffff;
+        }
+
+        .btn-secondary {
+            background: #e5e7eb;
+            color: #111827;
+        }
+
+        .error {
+            font-size: 12px;
+            color: #b91c1c;
+            margin-bottom: 8px;
+        }
+
+        .badge-level-high {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: #fee2e2;
+            color: #b91c1c;
+            font-size: 11px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+
+<div class="page">
+    <p style="font-size:12px; margin:0 0 8px;">
+        <a href="{% url 'zonal-demand' %}">&larr; Back to Demand Alerts</a>
+    </p>
+
+    <div class="card">
+        <h1 class="title">Dispatch Spare Bus</h1>
+        <p class="subtitle">
+            You are adding an extra bus for this crowded point.
+        </p>
+
+        <div class="summary-grid">
+            <div>
+                <div class="label">Route</div>
+                <div class="value">
+                    {{ route.number }} – {{ route.name }}
+                </div>
+            </div>
+            <div>
+                <div class="label">Date</div>
+                <div class="value">
+                    {{ selected_date|date:"Y-m-d" }}
+                </div>
+            </div>
+            <div>
+                <div class="label">Crowded at stop</div>
+                <div class="value">
+                    {{ alert.stop.name }}
+                </div>
+            </div>
+            <div>
+                <div class="label">Expected people after this stop</div>
+                <div class="value">
+                    {{ alert.number_of_people }}
+                    {% if alert.get_level %}
+                        &nbsp; <span class="badge-level-high">{{ alert.get_level|title }}</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <p class="subtitle" style="margin-bottom:10px;">
+            Choose a spare bus, driver, and departure time. We create a new
+            <strong>Schedule</strong> starting on this route.
+        </p>
+
+        {% if error %}
+            <div class="error">{{ error }}</div>
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+
+            <div class="field">
+                <label for="bus_id">Spare Bus</label>
+                <select name="bus_id" id="bus_id" required>
+                    <option value="">-- Select spare bus --</option>
+                    {% for bus in buses %}
+                        <option value="{{ bus.id }}">
+                            {{ bus.number_plate }} (capacity: {{ bus.capacity }})
+                        </option>
+                    {% empty %}
+                        <option value="">No idle buses available</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="driver_id">Driver</label>
+                <select name="driver_id" id="driver_id" required>
+                    <option value="">-- Select driver --</option>
+                    {% for d in drivers %}
+                        <option value="{{ d.id }}">
+                            {{ d.name|default:d.email }}
+                            {% if d.zone %} – {{ d.zone.name }}{% endif %}
+                        </option>
+                    {% empty %}
+                        <option value="">No drivers found</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="date">Service date</label>
+                <input
+                    type="date"
+                    id="date"
+                    name="date"
+                    value="{{ selected_date|date:'Y-m-d' }}"
+                    required
+                >
+            </div>
+
+            <div class="field">
+                <label for="departure_time">Departure time (start of spare trip)</label>
+                <input
+                    type="time"
+                    id="departure_time"
+                    name="departure_time"
+                    value="{{ initial_departure }}"
+                    required
+                >
+            </div>
+
+            <div class="field">
+                <label for="arrival_time">
+                    Arrival time (optional – you can adjust later on schedule page)
+                </label>
+                <input
+                    type="time"
+                    id="arrival_time"
+                    name="arrival_time"
+                >
+            </div>
+
+            <div class="actions">
+                <a href="{% url 'zonal-demand' %}" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">
+                    Create spare bus schedule
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+</body>
+</html>

@@ -6,6 +6,7 @@ Manages buses and their schedules
 from django.db import models
 from django.conf import settings
 from routes.models import Route
+from demand.models import DemandAlert   # 👈 NEW import
 
 
 class Bus(models.Model):
@@ -29,7 +30,7 @@ class Bus(models.Model):
         default=5.0,
         help_text="Fuel efficiency in km/liter"
     )
-    
+
     # Service type
     SERVICE_TYPES = (
         ('all_stop', 'All Stop Service'),
@@ -42,13 +43,13 @@ class Bus(models.Model):
         default='all_stop',
         help_text="Type of service this bus provides"
     )
-    
+
     # Status
     is_active = models.BooleanField(
         default=True,
         help_text="Whether bus is operational"
     )
-    
+
     # Real-time tracking fields
     current_latitude = models.DecimalField(
         max_digits=10,
@@ -88,15 +89,15 @@ class Bus(models.Model):
         related_name='current_buses',
         help_text="Current active schedule"
     )
-    
+
     class Meta:
         verbose_name = 'Bus'
         verbose_name_plural = 'Buses'
         ordering = ['number_plate']
-    
+
     def __str__(self):
         return f"{self.number_plate} (Seats: {self.capacity})"
-    
+
     def update_location(self, latitude, longitude):
         """
         Update bus location with timestamp
@@ -133,12 +134,12 @@ class Schedule(models.Model):
         related_name='schedules',
         help_text="Driver assigned to this schedule"
     )
-    
+
     # Timing
     date = models.DateField(help_text="Date of the trip")
     departure_time = models.TimeField(help_text="Start time from origin")
     arrival_time = models.TimeField(help_text="Approximate arrival at destination")
-    
+
     # Seat management
     total_seats = models.PositiveIntegerField(
         help_text="Total available seats (usually equals bus capacity)"
@@ -155,17 +156,31 @@ class Schedule(models.Model):
         blank=True,
         help_text="When driver last updated passenger count"
     )
-    
+
     current_stop_sequence = models.PositiveIntegerField(
         default=0,
         blank=True,
         help_text="Sequence number of the current stop in the route",
     )
-    
+
+    # 🔥 NEW FIELDS: mark spare-bus trips
+    is_spare_trip = models.BooleanField(
+        default=False,
+        help_text="True if this schedule was created as a spare bus from a demand alert.",
+    )
+    source_alert = models.ForeignKey(
+        DemandAlert,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="spare_schedules",
+        help_text="Demand alert that triggered this spare trip (if any).",
+    )
+
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         verbose_name = 'Schedule'
         verbose_name_plural = 'Schedules'
@@ -175,21 +190,21 @@ class Schedule(models.Model):
             ['bus', 'date', 'departure_time'],
             ['driver', 'date', 'departure_time'],
         ]
-    
+
     def __str__(self):
         return f"{self.route.number} - {self.date} {self.departure_time} ({self.bus.number_plate})"
-    
+
     def is_seat_available(self):
         """Check if seats are available"""
         return self.available_seats > 0
-    
+
     def book_seat(self, count=1):
         """
         Book seats on this schedule
-        
+
         Args:
             count: Number of seats to book
-        
+
         Returns:
             bool: True if booking successful, False otherwise
         """
@@ -198,7 +213,7 @@ class Schedule(models.Model):
             self.save()
             return True
         return False
-    
+
     def set_passenger_count(self, count: int):
         """
         Update current passenger count and keep available seats in sync.
@@ -220,8 +235,6 @@ class Schedule(models.Model):
                 "available_seats",
             ]
         )
-        
-        
 
 
 class BusSchedule(models.Model):
@@ -244,15 +257,15 @@ class BusSchedule(models.Model):
     date = models.DateField(help_text="Date of assignment")
     start_time = models.TimeField(help_text="When bus starts this route")
     end_time = models.TimeField(help_text="When bus finishes this route")
-    
+
     class Meta:
         verbose_name = 'Bus Assignment'
         verbose_name_plural = 'Bus Assignments'
         ordering = ['date', 'start_time']
-    
+
     def __str__(self):
         return f"{self.bus} on {self.route} - {self.date} {self.start_time}-{self.end_time}"
-    
+
     def duration_hours(self):
         """Calculate duration of this assignment in hours"""
         from datetime import datetime

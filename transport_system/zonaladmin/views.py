@@ -9,7 +9,7 @@ from django.db.models import Sum, Count
 from users.models import CustomUser
 from preinforms.models import PreInform
 from schedules.models import Schedule, Bus
-from routes.models import Route
+from routes.models import Route, Stop
 from demand.models import DemandAlert
 
 # Alert engines
@@ -174,24 +174,32 @@ def zonal_preinforms(request):
     summary["unique_stops"] = base_qs.values("boarding_stop_id").distinct().count()
 
     # ----- Grouped by route -----
-    route_stats = base_qs.values(
-        "route__id",
-        "route__number",
-        "route__name",
-    ).annotate(
-        total_passengers=Sum("passenger_count"),
-        total_preinforms=Count("id"),
-    ).order_by("-total_passengers")
+    route_stats = (
+        base_qs.values(
+            "route__id",
+            "route__number",
+            "route__name",
+        )
+        .annotate(
+            total_passengers=Sum("passenger_count"),
+            total_preinforms=Count("id"),
+        )
+        .order_by("-total_passengers")
+    )
 
     # ----- Grouped by stop + time -----
-    stop_time_stats = base_qs.values(
-        "boarding_stop__id",
-        "boarding_stop__name",
-        "desired_time",
-    ).annotate(
-        total_passengers=Sum("passenger_count"),
-        total_preinforms=Count("id"),
-    ).order_by("boarding_stop__name", "desired_time")
+    stop_time_stats = (
+        base_qs.values(
+            "boarding_stop__id",
+            "boarding_stop__name",
+            "desired_time",
+        )
+        .annotate(
+            total_passengers=Sum("passenger_count"),
+            total_preinforms=Count("id"),
+        )
+        .order_by("boarding_stop__name", "desired_time")
+    )
 
     context = {
         "user": user,
@@ -358,16 +366,10 @@ def assign_bus_view(request):
 @login_required
 def zonal_demand_alerts(request):
     """
-    Shows two sections:
-
-    - Pre-inform alerts: people waiting at stops (from NOTED pre-informs)
-    - Prediction alerts: expected people inside buses after each stop
-      (built from running-bus prediction engine)
-
-    For prediction alerts we try to attach a schedule_guess:
-    - We don't have a schedule FK on DemandAlert
-    - So we try to find a running schedule on that route & date
-      and expose it as alert.derived_schedule for the template.
+    Demand alerts page:
+      - Uses NOTED pre-informs + predictions
+      - Split into two tables (Pre-Inform based & Prediction based)
+      - Allows dispatching spare buses (prediction section)
     """
     user = request.user
 
@@ -394,40 +396,16 @@ def zonal_demand_alerts(request):
 
     # 3) Load alerts only for this date (+ zone via filter_zone)
     base_qs = (
-        DemandAlert.objects
-        .select_related("stop", "stop__route", "user")   # ✅ NO 'schedule' HERE
+        DemandAlert.objects.select_related("stop", "stop__route", "user")
         .filter(created_at__date=selected_date)
-        .order_by("-created_at")
+        .order_by("stop__route__number", "stop__sequence", "-created_at")
     )
+
     base_qs = filter_zone(base_qs, user)
 
-    # Split into two groups using text we set in admin_notes
-    preinform_qs = base_qs.filter(admin_notes__icontains="Pre-Informs")
-    prediction_qs = base_qs.filter(admin_notes__icontains="Prediction (Bus load)")
-
-    # Turn into lists so we can attach attributes
-    preinform_alerts = list(preinform_qs)
-    prediction_alerts = list(prediction_qs)
-
-    # Try to attach a guessed schedule for prediction alerts
-    for alert in prediction_alerts:
-        stop_route = getattr(alert.stop, "route", None)
-        if not stop_route:
-            alert.derived_schedule = None
-            continue
-
-        sched = (
-            Schedule.objects
-            .select_related("bus")
-            .filter(
-                route=stop_route,
-                date=selected_date,
-                bus__is_running=True,
-            )
-            .order_by("departure_time")
-            .first()
-        )
-        alert.derived_schedule = sched
+    # Split into 2 groups based on admin_notes
+    preinform_alerts = base_qs.filter(admin_notes__icontains="Pre-Informs")
+    prediction_alerts = base_qs.filter(admin_notes__icontains="Prediction (Bus load)")
 
     context = {
         "user": user,
@@ -440,15 +418,170 @@ def zonal_demand_alerts(request):
 
 
 # --------------------------
+# 6b) DISPATCH SPARE BUS FROM ALERT
+# --------------------------
+@login_required
+def dispatch_spare_bus(request, alert_id):
+    """
+    Zonal / central admin uses this page to convert an alert into
+    a real spare-bus schedule.
+
+    - Takes a DemandAlert (usually prediction-based).
+    - Lets admin pick:
+        * Spare bus (from idle, active buses)
+        * Driver
+        * Date & departure time
+    - Creates a new Schedule.
+    - Marks bus as running and links it to that schedule.
+    - Marks alert as 'dispatched' + updates admin_notes.
+    """
+    user = request.user
+
+    alert = get_object_or_404(
+        DemandAlert.objects.select_related("stop", "stop__route"),
+        id=alert_id,
+    )
+
+    # Zonal admin: restrict to own zone
+    if getattr(user, "role", None) == "zonal_admin" and getattr(user, "zone_id", None):
+        if alert.stop.route.zone_id != user.zone_id:
+            return redirect("zonal-demand")
+
+    route = alert.stop.route
+    # Default date: alert creation date (or today fallback)
+    alert_date = getattr(alert, "created_at", None)
+    if alert_date is not None:
+        selected_date = alert_date.date()
+    else:
+        selected_date = timezone.localdate()
+
+    # Candidate spare buses: active & currently not running
+    buses = Bus.objects.filter(is_active=True, is_running=False).order_by("number_plate")
+
+    # Drivers (filter by zone if zonal admin)
+    if getattr(user, "role", None) == "zonal_admin" and getattr(user, "zone_id", None):
+        drivers = CustomUser.objects.filter(role="driver", zone=user.zone)
+    else:
+        drivers = CustomUser.objects.filter(role="driver")
+
+    error = None
+
+    if request.method == "POST":
+        bus_id = request.POST.get("bus_id")
+        driver_id = request.POST.get("driver_id")
+        date_str = request.POST.get("date")
+        departure_time_str = request.POST.get("departure_time")
+        arrival_time_str = request.POST.get("arrival_time")
+
+        # Parse date
+        try:
+            sched_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except Exception:
+            sched_date = selected_date
+
+        # Parse times (HH:MM)
+        try:
+            departure_time = datetime.strptime(departure_time_str, "%H:%M").time()
+        except Exception:
+            departure_time = None
+
+        try:
+            arrival_time = (
+                datetime.strptime(arrival_time_str, "%H:%M").time()
+                if arrival_time_str
+                else None
+            )
+        except Exception:
+            arrival_time = None
+
+        if not (bus_id and driver_id and departure_time):
+            error = "Please select a spare bus, driver and departure time."
+        else:
+            bus_obj = get_object_or_404(Bus, id=bus_id)
+            driver_obj = get_object_or_404(CustomUser, id=driver_id, role="driver")
+
+            # Create the spare schedule  🔹 mark as spare + link to alert
+            schedule = Schedule.objects.create(
+                route=route,
+                bus=bus_obj,
+                driver=driver_obj,
+                date=sched_date,
+                departure_time=departure_time,
+                arrival_time=arrival_time or departure_time,
+                total_seats=bus_obj.capacity,
+                available_seats=bus_obj.capacity,
+                is_spare_trip=True,
+                source_alert=alert,
+            )
+
+            # Mark bus as running on this route/schedule
+            bus_obj.is_running = True
+            bus_obj.current_route = route
+            bus_obj.current_schedule = schedule
+            bus_obj.save(
+                update_fields=[
+                    "is_running",
+                    "current_route",
+                    "current_schedule",
+                ]
+            )
+
+            # Update alert status & notes
+            if hasattr(alert, "status"):
+                alert.status = "dispatched"
+
+            extra_note = (
+                f" Spare bus {bus_obj.number_plate} dispatched "
+                f"(schedule #{schedule.id})."
+            )
+            if alert.admin_notes:
+                alert.admin_notes = alert.admin_notes + extra_note
+            else:
+                alert.admin_notes = extra_note
+            alert.save(
+                update_fields=["admin_notes"]
+                + (["status"] if hasattr(alert, "status") else [])
+            )
+
+            # Back to demand list
+            return redirect("zonal-demand")
+
+    # Default suggested departure time = now (HH:MM)
+    initial_departure = timezone.localtime().strftime("%H:%M")
+
+    context = {
+        "user": user,
+        "alert": alert,
+        "route": route,
+        "selected_date": selected_date,
+        "buses": buses,
+        "drivers": drivers,
+        "initial_departure": initial_departure,
+        "error": error,
+    }
+
+    return render(request, "zonaladmin/dispatch_spare_bus.html", context)
+
+
+# --------------------------
 # 7) ROUTES PAGE
 # --------------------------
 @login_required
 def zonal_routes(request):
-    user = request.user
-    routes = filter_zone(
-        Route.objects.all().select_related("zone"),
-        user,
-    ).order_by("number")
+    """
+    Simple list of routes for Zonal Admin.
+    We do NOT depend on any zone field to avoid breaking models.
+    """
+    routes = Route.objects.all().order_by("number")
+
+    # stop count per route
+    stop_counts_qs = (
+        Stop.objects.values("route_id").annotate(count=Count("id"))
+    )
+    stop_count_map = {row["route_id"]: row["count"] for row in stop_counts_qs}
+
+    for r in routes:
+        r.stop_count = stop_count_map.get(r.id, 0)
 
     return render(request, "zonaladmin/routes.html", {"routes": routes})
 
