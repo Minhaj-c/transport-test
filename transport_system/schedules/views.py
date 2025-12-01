@@ -420,6 +420,23 @@ def update_current_stop(request):
             status=status.HTTP_403_FORBIDDEN,
         )
 
+    # 🔒 NEW: don't allow moving the bus backwards
+    old_seq = schedule.current_stop_sequence or 0
+    if stop_sequence < old_seq:
+        # Ignore backward update – keep existing value
+        return Response(
+            {
+                "success": False,
+                "message": (
+                    "Ignored update: stop_sequence "
+                    f"{stop_sequence} is less than current_stop_sequence {old_seq}."
+                ),
+                "current_stop_sequence": old_seq,
+                "schedule": ScheduleSerializer(schedule).data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
     schedule.current_stop_sequence = stop_sequence
     schedule.save(update_fields=["current_stop_sequence"])
 
