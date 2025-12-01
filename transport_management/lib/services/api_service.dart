@@ -432,4 +432,55 @@ static Future<Map<String, dynamic>> updateCurrentStop({
   }
 }
 
+
+
+  // -----------------------------
+  // Passenger Live Status
+  // -----------------------------
+  static Future<Map<String, dynamic>> getLiveStatusForStop({
+    required int routeId,
+    required int stopId,
+    String? date, // yyyy-MM-dd
+  }) async {
+    try {
+      var url = ApiConfig.routeLiveStatus(routeId);
+      final params = <String, String>{
+        'stop_id': stopId.toString(),
+      };
+      if (date != null) {
+        params['date'] = date;
+      }
+
+      if (params.isNotEmpty) {
+        url += '?${params.entries.map((e) => '${e.key}=${e.value}').join('&')}';
+      }
+
+      print('🔍 Fetching live status from: $url');
+      print('Headers: $_headers');
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: _headers,
+      );
+
+      print('Live status response: ${response.statusCode}');
+      print('Live status body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body) as Map<String, dynamic>;
+      } else if (response.statusCode == 401) {
+        throw Exception('Authentication required');
+      } else {
+        throw Exception(
+          'Failed to load live status (${response.statusCode})',
+        );
+      }
+    } catch (e) {
+      print('❌ Error getting live status: $e');
+      rethrow;
+    }
+  }
+
+
+
 }

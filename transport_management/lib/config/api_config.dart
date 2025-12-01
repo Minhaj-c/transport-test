@@ -41,4 +41,8 @@ class ApiConfig {
 
   static String get updateCurrentStop =>
       '$baseUrl/api/schedules/current-stop/';
+
+
+  static String routeLiveStatus(int routeId) =>
+      '$baseUrl/api/routes/$routeId/live-status/';    
 }
