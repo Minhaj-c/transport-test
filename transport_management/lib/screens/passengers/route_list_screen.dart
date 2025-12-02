@@ -14,8 +14,9 @@ class RouteListScreen extends StatefulWidget {
 
 class _RouteListScreenState extends State<RouteListScreen> {
   final _searchController = TextEditingController();
-  final _originController = TextEditingController();
-  final _destinationController = TextEditingController();
+  final _startStopController = TextEditingController();
+  final _endStopController = TextEditingController();
+
   String _searchQuery = '';
   bool _showFilters = false;
   bool _filterApplied = false;
@@ -31,23 +32,24 @@ class _RouteListScreenState extends State<RouteListScreen> {
   @override
   void dispose() {
     _searchController.dispose();
-    _originController.dispose();
-    _destinationController.dispose();
+    _startStopController.dispose();
+    _endStopController.dispose();
     super.dispose();
   }
 
   void _clearFilters() {
     setState(() {
       _searchController.clear();
-      _originController.clear();
-      _destinationController.clear();
+      _startStopController.clear();
+      _endStopController.clear();
       _searchQuery = '';
       _filterApplied = false;
     });
   }
 
   void _applyFilters() {
-    if (_originController.text.isNotEmpty || _destinationController.text.isNotEmpty) {
+    if (_startStopController.text.isNotEmpty ||
+        _endStopController.text.isNotEmpty) {
       setState(() {
         _filterApplied = true;
       });
@@ -82,7 +84,8 @@ class _RouteListScreenState extends State<RouteListScreen> {
                   setState(() => _searchQuery = value.toLowerCase());
                 },
                 decoration: InputDecoration(
-                  hintText: 'Search routes by name or number...',
+                  hintText:
+                      'Search by route number / name / stop...',
                   prefixIcon: const Icon(Icons.search),
                   suffixIcon: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -96,11 +99,15 @@ class _RouteListScreenState extends State<RouteListScreen> {
                           },
                         ),
                       IconButton(
-                        icon: Icon(_showFilters ? Icons.filter_alt : Icons.filter_alt_outlined),
+                        icon: Icon(
+                          _showFilters
+                              ? Icons.filter_alt
+                              : Icons.filter_alt_outlined,
+                        ),
                         onPressed: () {
                           setState(() => _showFilters = !_showFilters);
                         },
-                        tooltip: 'Advanced Filters',
+                        tooltip: 'Search by stops',
                       ),
                     ],
                   ),
@@ -113,7 +120,7 @@ class _RouteListScreenState extends State<RouteListScreen> {
                 ),
               ),
 
-              // Advanced Filters (Origin/Destination)
+              // Advanced Filters: Start stop / End stop
               if (_showFilters) ...[
                 const SizedBox(height: 12),
                 Container(
@@ -128,10 +135,11 @@ class _RouteListScreenState extends State<RouteListScreen> {
                     children: [
                       const Row(
                         children: [
-                          Icon(Icons.filter_list, size: 20, color: Colors.blue),
+                          Icon(Icons.filter_list,
+                              size: 20, color: Colors.blue),
                           SizedBox(width: 8),
                           Text(
-                            'Where are you going?',
+                            'Find buses between two stops',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               color: Colors.blue,
@@ -141,15 +149,16 @@ class _RouteListScreenState extends State<RouteListScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      
-                      // Origin Field
+
+                      // Start stop
                       TextField(
-                        controller: _originController,
+                        controller: _startStopController,
                         onChanged: (value) => setState(() {}),
                         decoration: InputDecoration(
-                          labelText: 'From (Starting Point)',
-                          hintText: 'e.g., Central Station, Downtown',
-                          prefixIcon: const Icon(Icons.trip_origin, color: Colors.green),
+                          labelText: 'From stop',
+                          hintText: 'Enter starting stop name',
+                          prefixIcon: const Icon(Icons.trip_origin,
+                              color: Colors.green),
                           filled: true,
                           fillColor: Colors.white,
                           border: OutlineInputBorder(
@@ -158,15 +167,16 @@ class _RouteListScreenState extends State<RouteListScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      
-                      // Destination Field
+
+                      // End stop
                       TextField(
-                        controller: _destinationController,
+                        controller: _endStopController,
                         onChanged: (value) => setState(() {}),
                         decoration: InputDecoration(
-                          labelText: 'To (Destination)',
-                          hintText: 'e.g., Airport, University',
-                          prefixIcon: const Icon(Icons.location_on, color: Colors.red),
+                          labelText: 'To stop',
+                          hintText: 'Enter destination stop name',
+                          prefixIcon: const Icon(Icons.location_on,
+                              color: Colors.red),
                           filled: true,
                           fillColor: Colors.white,
                           border: OutlineInputBorder(
@@ -175,7 +185,7 @@ class _RouteListScreenState extends State<RouteListScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      
+
                       // Action Buttons
                       Row(
                         children: [
@@ -185,7 +195,8 @@ class _RouteListScreenState extends State<RouteListScreen> {
                               icon: const Icon(Icons.clear_all),
                               label: const Text('Clear'),
                               style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 12),
                               ),
                             ),
                           ),
@@ -194,9 +205,10 @@ class _RouteListScreenState extends State<RouteListScreen> {
                             child: ElevatedButton.icon(
                               onPressed: _applyFilters,
                               icon: const Icon(Icons.search),
-                              label: const Text('Find Routes'),
+                              label: const Text('Find buses'),
                               style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 12),
                               ),
                             ),
                           ),
@@ -211,7 +223,8 @@ class _RouteListScreenState extends State<RouteListScreen> {
               if (_filterApplied) ...[
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: Colors.green[100],
                     borderRadius: BorderRadius.circular(20),
@@ -219,10 +232,12 @@ class _RouteListScreenState extends State<RouteListScreen> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.check_circle, size: 16, color: Colors.green),
+                      const Icon(Icons.check_circle,
+                          size: 16, color: Colors.green),
                       const SizedBox(width: 6),
                       Text(
-                        'Showing routes: ${_originController.text.isNotEmpty ? _originController.text : "Any"} → ${_destinationController.text.isNotEmpty ? _destinationController.text : "Any"}',
+                        'From: ${_startStopController.text.isNotEmpty ? _startStopController.text : "Any"}  '
+                        '→  To: ${_endStopController.text.isNotEmpty ? _endStopController.text : "Any"}',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -232,7 +247,8 @@ class _RouteListScreenState extends State<RouteListScreen> {
                       const SizedBox(width: 6),
                       InkWell(
                         onTap: _clearFilters,
-                        child: const Icon(Icons.close, size: 16, color: Colors.green),
+                        child: const Icon(Icons.close,
+                            size: 16, color: Colors.green),
                       ),
                     ],
                   ),
@@ -258,6 +274,33 @@ class _RouteListScreenState extends State<RouteListScreen> {
   }
 
   Widget _buildRouteList(List<BusRoute> routes) {
+    // "Where is my bus?" – don’t show everything until user searches
+    if (_searchQuery.isEmpty && !_filterApplied) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.directions_bus, size: 80, color: Colors.grey[400]),
+              const SizedBox(height: 16),
+              const Text(
+                'Where is my bus?',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Enter your start and end stops, or type a\n'
+                'route number / stop name in the search box.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey[600]),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final filteredRoutes = _filterRoutes(routes);
 
     if (filteredRoutes.isEmpty) {
@@ -270,14 +313,16 @@ class _RouteListScreenState extends State<RouteListScreen> {
               Icon(Icons.search_off, size: 80, color: Colors.grey[400]),
               const SizedBox(height: 16),
               const Text(
-                'No routes found',
+                'No buses found',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               Text(
                 _filterApplied
-                    ? 'No routes connect these locations.\nTry different places or clear filters.'
-                    : 'Try different search terms',
+                    ? 'No route runs from this start stop to this end stop.\n'
+                      'Try different stops or clear filters.'
+                    : 'No route or stop matches this search.\n'
+                      'Try a different bus number or stop name.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey[600]),
               ),
@@ -294,7 +339,8 @@ class _RouteListScreenState extends State<RouteListScreen> {
     }
 
     return RefreshIndicator(
-      onRefresh: () => Provider.of<AppProvider>(context, listen: false).loadRoutes(),
+      onRefresh: () =>
+          Provider.of<AppProvider>(context, listen: false).loadRoutes(),
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: filteredRoutes.length,
@@ -306,46 +352,46 @@ class _RouteListScreenState extends State<RouteListScreen> {
     );
   }
 
+  /// Core filtering: text search + start/end stop logic
   List<BusRoute> _filterRoutes(List<BusRoute> routes) {
     return routes.where((route) {
-      // Quick search filter
+      // 1) Quick search (route number / name / any stop)
       if (_searchQuery.isNotEmpty) {
-        final matchesSearch = route.number.toLowerCase().contains(_searchQuery) ||
-            route.name.toLowerCase().contains(_searchQuery) ||
-            route.origin.toLowerCase().contains(_searchQuery) ||
-            route.destination.toLowerCase().contains(_searchQuery);
+        final stopMatch = route.stops.any(
+          (s) => s.name.toLowerCase().contains(_searchQuery),
+        );
+
+        final matchesSearch =
+            route.number.toLowerCase().contains(_searchQuery) ||
+                route.name.toLowerCase().contains(_searchQuery) ||
+                route.origin.toLowerCase().contains(_searchQuery) ||
+                route.destination.toLowerCase().contains(_searchQuery) ||
+                stopMatch;
+
         if (!matchesSearch) return false;
       }
 
-      // SMART FILTERING: Check if route connects origin to destination
+      // 2) Start stop / End stop filter
       if (_filterApplied) {
-        final originQuery = _originController.text.toLowerCase().trim();
-        final destQuery = _destinationController.text.toLowerCase().trim();
-        
-        // Case 1: Both origin and destination specified
-        if (originQuery.isNotEmpty && destQuery.isNotEmpty) {
-          // Check if route has stops matching both locations
-          final hasOrigin = _routePassesThroughLocation(route, originQuery);
-          final hasDest = _routePassesThroughLocation(route, destQuery);
-          
-          // Only show route if it connects both locations
-          if (!hasOrigin || !hasDest) return false;
-          
-          // Additional check: Make sure origin comes before destination
-          final originStopIndex = _getStopIndexForLocation(route, originQuery);
-          final destStopIndex = _getStopIndexForLocation(route, destQuery);
-          
-          if (originStopIndex >= 0 && destStopIndex >= 0) {
-            if (originStopIndex >= destStopIndex) return false; // Wrong direction
-          }
+        final startQuery = _startStopController.text.toLowerCase().trim();
+        final endQuery = _endStopController.text.toLowerCase().trim();
+
+        // Case: both start and end stop entered
+        if (startQuery.isNotEmpty && endQuery.isNotEmpty) {
+          final startIdx = _getStopIndexForStop(route, startQuery);
+          final endIdx = _getStopIndexForStop(route, endQuery);
+
+          // Must exist on this route and be in correct order
+          if (startIdx < 0 || endIdx < 0) return false;
+          if (startIdx >= endIdx) return false;
         }
-        // Case 2: Only origin specified
-        else if (originQuery.isNotEmpty) {
-          if (!_routePassesThroughLocation(route, originQuery)) return false;
+        // Only start stop entered
+        else if (startQuery.isNotEmpty) {
+          if (!_routeHasStop(route, startQuery)) return false;
         }
-        // Case 3: Only destination specified
-        else if (destQuery.isNotEmpty) {
-          if (!_routePassesThroughLocation(route, destQuery)) return false;
+        // Only end stop entered
+        else if (endQuery.isNotEmpty) {
+          if (!_routeHasStop(route, endQuery)) return false;
         }
       }
 
@@ -353,42 +399,43 @@ class _RouteListScreenState extends State<RouteListScreen> {
     }).toList();
   }
 
-  // Check if route passes through a location (checks origin, destination, and stops)
-  bool _routePassesThroughLocation(BusRoute route, String location) {
-    location = location.toLowerCase();
-    
-    // Check route origin/destination
-    if (route.origin.toLowerCase().contains(location)) return true;
-    if (route.destination.toLowerCase().contains(location)) return true;
-    
-    // Check all stops
+  /// Check if a route has a given stop name (including origin/destination)
+  bool _routeHasStop(BusRoute route, String stopName) {
+    stopName = stopName.toLowerCase();
+
+    if (route.origin.toLowerCase().contains(stopName)) return true;
+    if (route.destination.toLowerCase().contains(stopName)) return true;
+
     for (var stop in route.stops) {
-      if (stop.name.toLowerCase().contains(location)) return true;
+      if (stop.name.toLowerCase().contains(stopName)) return true;
     }
-    
+
     return false;
   }
 
-  // Get the stop index for a location (-1 if not found)
-  int _getStopIndexForLocation(BusRoute route, String location) {
-    location = location.toLowerCase();
-    
-    // Check if it's the origin (sequence 0)
-    if (route.origin.toLowerCase().contains(location)) return 0;
-    
-    // Check stops
+  /// Get "position" of a stop along the route.
+  /// 0 -> origin, 1..N -> intermediate stops by sequence, last+1 -> destination.
+  int _getStopIndexForStop(BusRoute route, String stopName) {
+    stopName = stopName.toLowerCase();
+
+    // Origin as stop index 0
+    if (route.origin.toLowerCase().contains(stopName)) {
+      return 0;
+    }
+
+    // Intermediate stops (use sequence as position)
     for (var stop in route.stops) {
-      if (stop.name.toLowerCase().contains(location)) {
+      if (stop.name.toLowerCase().contains(stopName)) {
         return stop.sequence;
       }
     }
-    
-    // Check if it's destination (last sequence)
-    if (route.destination.toLowerCase().contains(location)) {
+
+    // Destination as last index
+    if (route.destination.toLowerCase().contains(stopName)) {
       return route.stops.isEmpty ? 1 : route.stops.length + 1;
     }
-    
-    return -1;
+
+    return -1; // Not found on this route
   }
 }
 
@@ -459,7 +506,8 @@ class _RouteCard extends StatelessWidget {
               // Origin to Destination
               Row(
                 children: [
-                  const Icon(Icons.trip_origin, size: 16, color: Colors.green),
+                  const Icon(Icons.trip_origin,
+                      size: 16, color: Colors.green),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -472,7 +520,8 @@ class _RouteCard extends StatelessWidget {
               const SizedBox(height: 4),
               Row(
                 children: [
-                  const Icon(Icons.location_on, size: 16, color: Colors.red),
+                  const Icon(Icons.location_on,
+                      size: 16, color: Colors.red),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -520,7 +569,8 @@ class _InfoChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: Colors.grey[100],
         borderRadius: BorderRadius.circular(8),

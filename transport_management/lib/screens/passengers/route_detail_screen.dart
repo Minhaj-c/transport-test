@@ -8,6 +8,9 @@ import 'preinform_screen.dart';
 import 'bus_tracking_screen.dart';
 import 'package:intl/intl.dart';
 import '../../services/api_service.dart'; 
+import 'dart:async';
+
+
 class RouteDetailScreen extends StatefulWidget {
   final BusRoute route;
   const RouteDetailScreen({super.key, required this.route});
@@ -992,7 +995,7 @@ void _showLiveStatusBottomSheet(
 }
 
 /// 🔥 NEW: Dedicated screen for live status of one bus (one schedule)
-class BusLiveScreen extends StatelessWidget {
+class BusLiveScreen extends StatefulWidget {
   final Schedule schedule;
   final BusRoute route;
 
@@ -1002,27 +1005,86 @@ class BusLiveScreen extends StatelessWidget {
     required this.route,
   });
 
-  Color _getOccupancyColor() {
-    final occupancyRate = schedule.occupancyRate;
-    if (schedule.availableSeats == 0) return Colors.grey;
-    if (occupancyRate >= 80) return Colors.red;
-    if (occupancyRate >= 50) return Colors.orange;
-    return Colors.green;
+  @override
+  State<BusLiveScreen> createState() => _BusLiveScreenState();
+}
+
+class _BusLiveScreenState extends State<BusLiveScreen> {
+  late Schedule _schedule;
+  Timer? _timer;
+  bool _isRefreshing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _schedule = widget.schedule;
+    _startAutoRefresh();
   }
 
-  String _getOccupancyStatus() {
-    final occupancyRate = schedule.occupancyRate;
-    if (schedule.availableSeats == 0) return 'FULL';
-    if (occupancyRate >= 80) return 'ALMOST FULL';
-    if (occupancyRate >= 50) return 'FILLING UP';
-    return 'COMFORTABLE';
+  void _startAutoRefresh() {
+    _timer = Timer.periodic(const Duration(seconds: 15), (_) {
+      _refreshSchedule();
+    });
+  }
+
+  Future<void> _refreshSchedule() async {
+    if (_isRefreshing) return;
+    _isRefreshing = true;
+
+    try {
+      // We re-use getSchedules(routeId + today) and pick the same id
+      final today = DateTime.now();
+      final dateStr = DateFormat('yyyy-MM-dd').format(today);
+
+      final list = await ApiService.getSchedules(
+        routeId: widget.route.id,
+        date: dateStr,
+      );
+
+      final updated = list.firstWhere(
+        (s) => s.id == _schedule.id,
+        orElse: () => _schedule,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _schedule = updated;
+      });
+    } catch (e) {
+      debugPrint('Error refreshing schedule: $e');
+    } finally {
+      _isRefreshing = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final schedule = _schedule;
     final dateFormat = DateFormat('EEEE, MMM dd, yyyy');
-    final statusColor = _getOccupancyColor();
 
+    Color _getOccupancyColor() {
+      final occupancyRate = schedule.occupancyRate;
+      if (schedule.availableSeats == 0) return Colors.grey;
+      if (occupancyRate >= 80) return Colors.red;
+      if (occupancyRate >= 50) return Colors.orange;
+      return Colors.green;
+    }
+
+    String _getOccupancyStatus() {
+      final occupancyRate = schedule.occupancyRate;
+      if (schedule.availableSeats == 0) return 'FULL';
+      if (occupancyRate >= 80) return 'ALMOST FULL';
+      if (occupancyRate >= 50) return 'FILLING UP';
+      return 'COMFORTABLE';
+    }
+
+    final statusColor = _getOccupancyColor();
     final currentStopName = schedule.currentStopName;
     final currentStopSeq = schedule.currentStopSequence;
     final nextStopName = schedule.nextStopName;
@@ -1039,7 +1101,7 @@ class BusLiveScreen extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => BusTrackingScreen(route: route),
+                  builder: (_) => BusTrackingScreen(route: widget.route),
                 ),
               );
             },
@@ -1091,7 +1153,7 @@ class BusLiveScreen extends StatelessWidget {
                                 ),
                               ),
                               Text(
-                                'Route ${route.number}: ${route.origin} → ${route.destination}',
+                                'Route ${widget.route.number}: ${widget.route.origin} → ${widget.route.destination}',
                                 style: TextStyle(
                                   fontSize: 13,
                                   color: Colors.grey[700],
@@ -1129,7 +1191,8 @@ class BusLiveScreen extends StatelessWidget {
                       child: LinearProgressIndicator(
                         value: schedule.occupiedSeats / schedule.totalSeats,
                         backgroundColor: Colors.grey[200],
-                        valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(statusColor),
                         minHeight: 12,
                       ),
                     ),
@@ -1199,7 +1262,8 @@ class BusLiveScreen extends StatelessWidget {
                     Text(
                       'Last passenger update: '
                       '${schedule.lastPassengerUpdate != null ? DateFormat.Hm().format(schedule.lastPassengerUpdate!) : "—"}',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      style:
+                          const TextStyle(fontSize: 12, color: Colors.grey),
                     ),
                   ],
                 ),
@@ -1240,12 +1304,12 @@ class BusLiveScreen extends StatelessWidget {
                     _DetailRow(
                       icon: Icons.straighten,
                       label: 'Distance',
-                      value: route.distanceInfo,
+                      value: widget.route.distanceInfo,
                     ),
                     _DetailRow(
                       icon: Icons.schedule,
                       label: 'Duration',
-                      value: route.durationInfo,
+                      value: widget.route.durationInfo,
                     ),
                   ],
                 ),
