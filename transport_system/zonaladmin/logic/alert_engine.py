@@ -95,52 +95,55 @@ def generate_preinform_alerts(for_date=None, zone=None):
 def compute_bus_load_for_schedule(schedule):
     """
     For ONE schedule:
-    - Start from schedule.current_passengers (current load inside bus)
-    - Add NOTED pre-informs per stop (for this route + date)
-    - If driver has set current_stop_sequence, only consider
-      stops with sequence > current_stop_sequence (future stops).
-    - Return per-stop expected load, max load and first overflow stop
+
+    - Start from schedule.current_passengers (people currently inside).
+    - Use NOTED pre-informs for this route + date.
+    - For each pre-inform, passengers ride from boarding_stop.sequence
+      up to (but NOT including) dropoff_stop.sequence.
+    - If driver has set current_stop_sequence, we only look at stops
+      with sequence > current_stop_sequence.
     """
 
     route = schedule.route
     date = schedule.date
 
-    # Capacity: prefer schedule.total_seats, else bus.capacity
-    capacity = (
-        schedule.total_seats
-        or getattr(schedule.bus, "capacity", None)
-    )
-
-    # Passengers already inside the bus *now*
+    capacity = schedule.total_seats or getattr(schedule.bus, "capacity", None)
     base = schedule.current_passengers or 0
+    current_seq = getattr(schedule, "current_stop_sequence", 0) or 0
 
-    # ---------------------------------------------
-    # KEY CHANGE: only look at FUTURE stops
-    # ---------------------------------------------
-    current_seq = getattr(schedule, "current_stop_sequence", None)
-    if current_seq is None:
-        current_seq = 0
-
-    # All stops in order; if bus already started, keep only stops after it
+    # All stops in order; only future ones if current_seq set
     stops_qs = Stop.objects.filter(route=route).order_by("sequence")
     if current_seq:
         stops_qs = stops_qs.filter(sequence__gt=current_seq)
     stops = list(stops_qs)
 
-    # NOTED pre-informs for this route + date
-    pis = PreInform.objects.filter(
-        route=route,
-        date_of_travel=date,
-        status="noted",
+    # All NOTED pre-informs for this route + date
+    pis = (
+        PreInform.objects
+        .filter(route=route, date_of_travel=date, status="noted")
+        .select_related("boarding_stop", "dropoff_stop")
     )
 
-    boarding_by_stop = (
-        pis.values("boarding_stop")
-           .annotate(total=Sum("passenger_count"))
-    )
-    boarding_map = {
-        row["boarding_stop"]: row["total"] for row in boarding_by_stop
-    }
+    # Build + / - events per stop sequence
+    board_map = {}
+    drop_map = {}
+
+    for pi in pis:
+        count = pi.passenger_count or 0
+        if count <= 0:
+            continue
+
+        b_seq = pi.boarding_stop.sequence
+        d_stop = getattr(pi, "dropoff_stop", None)
+        d_seq = d_stop.sequence if d_stop else None
+
+        # People who board AFTER our current position
+        if b_seq > current_seq:
+            board_map[b_seq] = board_map.get(b_seq, 0) + count
+
+        # People who will get down AFTER our current position
+        if d_seq is not None and d_seq > current_seq:
+            drop_map[d_seq] = drop_map.get(d_seq, 0) + count
 
     load = base
     max_load = base
@@ -148,8 +151,12 @@ def compute_bus_load_for_schedule(schedule):
     stop_data = []
 
     for st in stops:
-        boarding = boarding_map.get(st.id, 0) or 0
-        load += boarding
+        seq = st.sequence
+
+        boarding = board_map.get(seq, 0)
+        alighting = drop_map.get(seq, 0)
+
+        load = max(load + boarding - alighting, 0)
 
         if load > max_load:
             max_load = load
@@ -161,6 +168,7 @@ def compute_bus_load_for_schedule(schedule):
             {
                 "stop": st,
                 "boarding": boarding,
+                "alighting": alighting,
                 "expected_load": load,
             }
         )
@@ -174,8 +182,8 @@ def compute_bus_load_for_schedule(schedule):
         "max_load": max_load,
         "overflow_stop": overflow_stop,
     }
-
-
+    
+    
 def debug_print_bus_load_for_schedule(schedule):
     """
     Helper for Django shell (does NOT touch DB).

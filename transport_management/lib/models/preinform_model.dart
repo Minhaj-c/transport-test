@@ -7,13 +7,15 @@ class PreInform {
   final DateTime dateOfTravel;
   final String desiredTime;
   final int boardingStopId;
+  final int? dropoffStopId;                        
   final Map<String, dynamic>? stopDetails;
+  final Map<String, dynamic>? dropoffStopDetails;   
   final int passengerCount;
   final String status;
   final DateTime createdAt;
 
   PreInform({
-    required this.id,
+     required this.id,
     required this.userId,
     required this.userName,
     required this.routeId,
@@ -21,7 +23,9 @@ class PreInform {
     required this.dateOfTravel,
     required this.desiredTime,
     required this.boardingStopId,
+    this.dropoffStopId,
     this.stopDetails,
+    this.dropoffStopDetails,
     required this.passengerCount,
     required this.status,
     required this.createdAt,
@@ -37,16 +41,23 @@ class PreInform {
       dateOfTravel: DateTime.parse(json['date_of_travel']),
       desiredTime: json['desired_time'],
       boardingStopId: json['boarding_stop'],
+      dropoffStopId: json['dropoff_stop'],                 
       stopDetails: json['stop_details'],
+      dropoffStopDetails: json['dropoff_stop_details'],    
       passengerCount: json['passenger_count'],
       status: json['status'],
       createdAt: DateTime.parse(json['created_at']),
     );
   }
 
+
   String get routeName => routeDetails?['name'] ?? 'Route $routeId';
-  String get stopName => stopDetails?['name'] ?? 'Stop $boardingStopId';
-  
+  String get boardingStopName =>
+      stopDetails?['name'] ?? 'Stop $boardingStopId';
+  String get dropoffStopName =>
+      dropoffStopDetails?['name'] ??
+      (dropoffStopId != null ? 'Stop $dropoffStopId' : 'Not set');
+
   String get statusText {
     switch (status) {
       case 'pending':

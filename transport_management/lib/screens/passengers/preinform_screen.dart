@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
 import '../../models/route_model.dart';
+import '../../models/stop_model.dart'; // ✅ for Stop
 import '../../services/api_service.dart';
 import '../../widgets/custom_button.dart';
 
@@ -15,11 +17,36 @@ class PreInformScreen extends StatefulWidget {
 
 class _PreInformScreenState extends State<PreInformScreen> {
   final _formKey = GlobalKey<FormState>();
+
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
-  int? _selectedStopId;
+  int? _selectedBoardingStopId;
+  int? _selectedDropoffStopId;
   int _passengerCount = 1;
   bool _isLoading = false;
+
+  // ---------- Helpers for stops ----------
+
+  Stop? _getStopById(int id) {
+    try {
+      return widget.route.stops.firstWhere((s) => s.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  List<Stop> _getDropoffCandidates() {
+    if (_selectedBoardingStopId == null) return [];
+
+    final boarding = _getStopById(_selectedBoardingStopId!);
+    if (boarding == null) return [];
+
+    return widget.route.stops
+        .where((s) => s.sequence > boarding.sequence)
+        .toList();
+  }
+
+  // ---------- Pickers ----------
 
   Future<void> _selectDate() async {
     final DateTime? picked = await showDatePicker(
@@ -65,6 +92,8 @@ class _PreInformScreenState extends State<PreInformScreen> {
     }
   }
 
+  // ---------- Submit ----------
+
   Future<void> _submitPreInform() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -78,18 +107,36 @@ class _PreInformScreenState extends State<PreInformScreen> {
       return;
     }
 
-    if (_selectedStopId == null) {
+    if (_selectedBoardingStopId == null) {
       _showError('Please select boarding stop');
+      return;
+    }
+
+    if (_selectedDropoffStopId == null) {
+      _showError('Please select drop-off stop');
+      return;
+    }
+
+    final boardingStop = _getStopById(_selectedBoardingStopId!);
+    final dropoffStop = _getStopById(_selectedDropoffStopId!);
+
+    if (boardingStop == null || dropoffStop == null) {
+      _showError('Something went wrong with the selected stops');
+      return;
+    }
+
+    if (dropoffStop.sequence <= boardingStop.sequence) {
+      _showError('Drop-off stop must be AFTER your boarding stop');
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      // ✅ DATE IN YYYY-MM-DD (matches Django)
+      // ✅ DATE IN YYYY-MM-DD
       final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate!);
 
-      // ✅ TIME IN HH:mm (24-hr) – matches your API doc
+      // ✅ TIME IN HH:mm (24-hr)
       final timeStr = _selectedTime!.hour.toString().padLeft(2, '0') +
           ':' +
           _selectedTime!.minute.toString().padLeft(2, '0');
@@ -98,7 +145,8 @@ class _PreInformScreenState extends State<PreInformScreen> {
         routeId: widget.route.id,
         dateOfTravel: dateStr,
         desiredTime: timeStr,
-        boardingStopId: _selectedStopId!,
+        boardingStopId: _selectedBoardingStopId!,
+        dropoffStopId: _selectedDropoffStopId!, // ✅ NEW
         passengerCount: _passengerCount,
       );
 
@@ -112,7 +160,6 @@ class _PreInformScreenState extends State<PreInformScreen> {
         ),
       );
 
-      // Navigate back with delay
       Future.delayed(const Duration(seconds: 1), () {
         if (mounted) Navigator.pop(context);
       });
@@ -134,8 +181,15 @@ class _PreInformScreenState extends State<PreInformScreen> {
     );
   }
 
+  // ---------- UI ----------
+
   @override
   Widget build(BuildContext context) {
+    final boardingStop =
+        _selectedBoardingStopId != null ? _getStopById(_selectedBoardingStopId!) : null;
+    final dropoffStop =
+        _selectedDropoffStopId != null ? _getStopById(_selectedDropoffStopId!) : null;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Pre-Inform Your Journey'),
@@ -150,7 +204,7 @@ class _PreInformScreenState extends State<PreInformScreen> {
               // Route Info Card
               Card(
                 elevation: 2,
-                color: Theme.of(context).primaryColor.withOpacity(0.1),
+                color: Colors.blue.shade50,
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
@@ -205,13 +259,25 @@ class _PreInformScreenState extends State<PreInformScreen> {
                           Text(widget.route.destination),
                         ],
                       ),
+                      if (boardingStop != null && dropoffStop != null) ...[
+                        const SizedBox(height: 12),
+                        const Divider(),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Your journey: ${boardingStop.name} → ${dropoffStop.name}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 24),
 
-              // Date Selection
+              // Date
               const Text(
                 'Travel Date *',
                 style: TextStyle(
@@ -229,12 +295,9 @@ class _PreInformScreenState extends State<PreInformScreen> {
                       color: _selectedDate != null
                           ? Theme.of(context).primaryColor
                           : Colors.grey[300]!,
-                      width: _selectedDate != null ? 2 : 1,
                     ),
                     borderRadius: BorderRadius.circular(12),
-                    color: _selectedDate != null
-                        ? Theme.of(context).primaryColor.withOpacity(0.05)
-                        : Colors.grey[50],
+                    color: Colors.grey[50],
                   ),
                   child: Row(
                     children: [
@@ -266,7 +329,7 @@ class _PreInformScreenState extends State<PreInformScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Time Selection
+              // Time
               const Text(
                 'Desired Time *',
                 style: TextStyle(
@@ -284,12 +347,9 @@ class _PreInformScreenState extends State<PreInformScreen> {
                       color: _selectedTime != null
                           ? Theme.of(context).primaryColor
                           : Colors.grey[300]!,
-                      width: _selectedTime != null ? 2 : 1,
                     ),
                     borderRadius: BorderRadius.circular(12),
-                    color: _selectedTime != null
-                        ? Theme.of(context).primaryColor.withOpacity(0.05)
-                        : Colors.grey[50],
+                    color: Colors.grey[50],
                   ),
                   child: Row(
                     children: [
@@ -320,7 +380,7 @@ class _PreInformScreenState extends State<PreInformScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Boarding Stop Selection
+              // Boarding Stop
               const Text(
                 'Boarding Stop *',
                 style: TextStyle(
@@ -354,21 +414,18 @@ class _PreInformScreenState extends State<PreInformScreen> {
                   : Container(
                       decoration: BoxDecoration(
                         border: Border.all(
-                          color: _selectedStopId != null
+                          color: _selectedBoardingStopId != null
                               ? Theme.of(context).primaryColor
                               : Colors.grey[300]!,
-                          width: _selectedStopId != null ? 2 : 1,
                         ),
                         borderRadius: BorderRadius.circular(12),
-                        color: _selectedStopId != null
-                            ? Theme.of(context).primaryColor.withOpacity(0.05)
-                            : Colors.grey[50],
+                        color: Colors.grey[50],
                       ),
                       child: DropdownButtonHideUnderline(
                         child: ButtonTheme(
                           alignedDropdown: true,
                           child: DropdownButton<int>(
-                            value: _selectedStopId,
+                            value: _selectedBoardingStopId,
                             hint: const Padding(
                               padding: EdgeInsets.symmetric(vertical: 12),
                               child: Text('Select boarding stop'),
@@ -377,6 +434,10 @@ class _PreInformScreenState extends State<PreInformScreen> {
                             icon: const Icon(Icons.arrow_drop_down),
                             borderRadius: BorderRadius.circular(12),
                             items: widget.route.stops.map((stop) {
+                              final isFirst = stop.sequence == 1;
+                              final isLast =
+                                  stop.sequence == widget.route.stops.length;
+
                               return DropdownMenuItem<int>(
                                 value: stop.id,
                                 child: Padding(
@@ -388,10 +449,9 @@ class _PreInformScreenState extends State<PreInformScreen> {
                                         width: 24,
                                         height: 24,
                                         decoration: BoxDecoration(
-                                          color: stop.sequence == 1
+                                          color: isFirst
                                               ? Colors.green
-                                              : stop.sequence ==
-                                                      widget.route.stops.length
+                                              : isLast
                                                   ? Colors.red
                                                   : Colors.blue,
                                           shape: BoxShape.circle,
@@ -436,12 +496,64 @@ class _PreInformScreenState extends State<PreInformScreen> {
                               );
                             }).toList(),
                             onChanged: (value) {
-                              setState(() => _selectedStopId = value);
+                              setState(() {
+                                _selectedBoardingStopId = value;
+                                // reset dropoff when boarding changes
+                                _selectedDropoffStopId = null;
+                              });
                             },
                           ),
                         ),
                       ),
                     ),
+              const SizedBox(height: 20),
+
+              // Dropoff Stop
+              const Text(
+                'Drop-off Stop *',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              if (widget.route.stops.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.orange[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.orange),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.warning, color: Colors.orange),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'No stops available for this route',
+                          style: TextStyle(color: Colors.orange),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else if (_selectedBoardingStopId == null)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey[300]!),
+                  ),
+                  child: const Text(
+                    'Please select your boarding stop first.\n\nThen you can pick where you will get down.',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                )
+              else
+                _buildDropoffDropdown(),
               const SizedBox(height: 20),
 
               // Passenger Count
@@ -478,7 +590,7 @@ class _PreInformScreenState extends State<PreInformScreen> {
                       width: 80,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).primaryColor.withOpacity(0.1),
+                        color: Colors.blue.shade50,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -524,7 +636,10 @@ class _PreInformScreenState extends State<PreInformScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Pre-inform helps us plan better service. This is optional - you can still board without pre-informing.',
+                        'By telling us BOTH where you get in and where you get down, we can:\n'
+                        '• Predict crowd at each stop\n'
+                        '• Add spare buses early if needed\n'
+                        '• Show other passengers which trips will be full',
                         style: TextStyle(
                           fontSize: 13,
                           color: Colors.blue[900],
@@ -550,6 +665,108 @@ class _PreInformScreenState extends State<PreInformScreen> {
               ),
               const SizedBox(height: 16),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDropoffDropdown() {
+    final dropoffStops = _getDropoffCandidates();
+
+    if (dropoffStops.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.orange[50],
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.orange),
+        ),
+        child: const Text(
+          'No later stops available after your boarding stop.\n'
+          'Try choosing an earlier boarding stop.',
+          style: TextStyle(color: Colors.orange),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: _selectedDropoffStopId != null
+              ? Theme.of(context).primaryColor
+              : Colors.grey[300]!,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        color: Colors.grey[50],
+      ),
+      child: DropdownButtonHideUnderline(
+        child: ButtonTheme(
+          alignedDropdown: true,
+          child: DropdownButton<int>(
+            value: _selectedDropoffStopId,
+            hint: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text('Select drop-off stop'),
+            ),
+            isExpanded: true,
+            icon: const Icon(Icons.arrow_drop_down),
+            borderRadius: BorderRadius.circular(12),
+            items: dropoffStops.map((stop) {
+              return DropdownMenuItem<int>(
+                value: stop.id,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: const BoxDecoration(
+                          color: Colors.purple,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${stop.sequence}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              stop.name,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              stop.distanceInfo,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+            onChanged: (value) {
+              setState(() => _selectedDropoffStopId = value);
+            },
           ),
         ),
       ),

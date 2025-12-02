@@ -92,14 +92,14 @@ class _MyPreInformsScreenState extends State<MyPreInformsScreen> {
     }
   }
 
-  /// 🔥 NEW: Use this pre-inform to fetch live crowd / buses at that stop
+  /// 🔥 Use this pre-inform to fetch live crowd / buses at that stop
   Future<void> _viewLiveStatus(PreInform preinform) async {
     try {
       final dateStr = DateFormat('yyyy-MM-dd').format(preinform.dateOfTravel);
 
       final data = await ApiService.getLiveStatusForStop(
         routeId: preinform.routeId,
-        stopId: preinform.boardingStopId,
+        stopId: preinform.boardingStopId, // user waits at boarding stop
         date: dateStr,
       );
 
@@ -148,7 +148,7 @@ class _MyPreInformsScreenState extends State<MyPreInformsScreen> {
           return _PreInformCard(
             preinform: preinform,
             onCancel: () => _cancelPreInform(preinform),
-            onViewLiveStatus: () => _viewLiveStatus(preinform), // 🔥 NEW
+            onViewLiveStatus: () => _viewLiveStatus(preinform),
           );
         },
       ),
@@ -159,7 +159,7 @@ class _MyPreInformsScreenState extends State<MyPreInformsScreen> {
 class _PreInformCard extends StatelessWidget {
   final PreInform preinform;
   final VoidCallback onCancel;
-  final VoidCallback? onViewLiveStatus; // 🔥 NEW
+  final VoidCallback? onViewLiveStatus;
 
   const _PreInformCard({
     required this.preinform,
@@ -293,15 +293,26 @@ class _PreInformCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
 
-            // Stop
+            // Boarding & Exit Stops (From → To)
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.location_on, size: 16),
+                const Icon(Icons.directions_bus, size: 16),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    preinform.stopName,
-                    style: const TextStyle(fontSize: 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'From: ${preinform.boardingStopName}',
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'To: ${preinform.dropoffStopName}',
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -332,7 +343,7 @@ class _PreInformCard extends StatelessWidget {
 
             const SizedBox(height: 8),
 
-            // 🔥 NEW: view live status button
+            // View live status button
             if (onViewLiveStatus != null)
               Align(
                 alignment: Alignment.centerRight,

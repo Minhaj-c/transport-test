@@ -460,11 +460,15 @@ def compute_future_load_for_schedule(schedule):
     Uses:
       - schedule.current_passengers
       - schedule.current_stop_sequence
-      - Pre-informs for this (route, date) AFTER current stop
+      - Pre-informs for this (route, date) with BOTH boarding & dropoff stops
 
-    Returns a dict that can be returned as JSON or used by admin demand views.
+    For each pre-inform:
+      - passengers ride from boarding_seq up to (but NOT including) dropoff_seq.
     """
-    capacity = schedule.total_seats or (schedule.bus.capacity if schedule.bus else None)
+
+    capacity = schedule.total_seats or (
+        schedule.bus.capacity if schedule.bus else None
+    )
     current_passengers = schedule.current_passengers or 0
     current_seq = schedule.current_stop_sequence or 0
 
@@ -474,34 +478,41 @@ def compute_future_load_for_schedule(schedule):
     route = schedule.route
     stops_qs = route.stops.all().order_by("sequence")
 
-    # ---- Get all future pre-informs ----
+    # ---- Get all relevant pre-informs ----
     try:
         from preinforms.models import PreInform
 
         preinforms_qs = (
             PreInform.objects
-            .filter(
-                route=route,
-                date_of_travel=schedule.date,
-                boarding_stop__sequence__gt=current_seq,
-            )
-            .select_related("boarding_stop")
+            .filter(route=route, date_of_travel=schedule.date, status="noted")
+            .select_related("boarding_stop", "dropoff_stop")
         )
 
-        future_demand = {}
+        board_map = {}
+        drop_map = {}
+
         for pi in preinforms_qs:
-            seq = pi.boarding_stop.sequence
-            incoming = getattr(pi, "passenger_count", None)
-            if incoming is None:
+            count = getattr(pi, "passenger_count", 0) or 0
+            if count <= 0:
                 continue
-            future_demand.setdefault(seq, 0)
-            future_demand[seq] += incoming
+
+            b_seq = pi.boarding_stop.sequence
+            d_stop = getattr(pi, "dropoff_stop", None)
+            d_seq = d_stop.sequence if d_stop else None
+
+            # people boarding after our current position
+            if b_seq > current_seq:
+                board_map[b_seq] = board_map.get(b_seq, 0) + count
+
+            # drop-offs that happen after current position
+            if d_seq is not None and d_seq > current_seq:
+                drop_map[d_seq] = drop_map.get(d_seq, 0) + count
 
     except Exception as e:
         print("⚠️ compute_future_load_for_schedule preinform error:", e)
-        future_demand = {}
+        board_map = {}
+        drop_map = {}
 
-    # ---- Walk through future stops and accumulate ----
     running_load = current_passengers
     stops_output = []
     will_overflow = False
@@ -513,9 +524,11 @@ def compute_future_load_for_schedule(schedule):
         if seq <= current_seq:
             continue
 
-        incoming = future_demand.get(seq, 0)
-        predicted_after = running_load + incoming
-        overflow_here = predicted_after > capacity
+        incoming = board_map.get(seq, 0)
+        leaving = drop_map.get(seq, 0)
+
+        running_load = max(running_load + incoming - leaving, 0)
+        overflow_here = capacity and running_load > capacity
 
         if overflow_here and not will_overflow:
             will_overflow = True
@@ -526,12 +539,11 @@ def compute_future_load_for_schedule(schedule):
                 "sequence": seq,
                 "name": stop.name,
                 "incoming_preinform": incoming,
-                "predicted_after": predicted_after,
+                "alighting_preinform": leaving,
+                "predicted_after": running_load,
                 "overflow": overflow_here,
             }
         )
-
-        running_load = predicted_after
 
     return {
         "schedule_id": schedule.id,

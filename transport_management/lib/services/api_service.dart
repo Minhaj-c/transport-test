@@ -152,6 +152,7 @@ class ApiService {
     required String dateOfTravel,
     required String desiredTime,
     required int boardingStopId,
+    required int dropoffStopId,   
     required int passengerCount,
   }) async {
     try {
@@ -163,6 +164,7 @@ class ApiService {
         'date_of_travel': dateOfTravel,
         'desired_time': desiredTime,
         'boarding_stop': boardingStopId,
+        'dropoff_stop': dropoffStopId,   
         'passenger_count': passengerCount,
       };
 
@@ -178,13 +180,18 @@ class ApiService {
       print('Create pre-inform body: ${response.body}');
 
       if (response.statusCode == 201) {
-        return json.decode(response.body) as Map<String, dynamic>;
+        final decoded = json.decode(response.body) as Map<String, dynamic>;
+        // your backend wraps it as {success, message, data}
+        if (decoded['data'] is Map<String, dynamic>) {
+          return decoded['data'] as Map<String, dynamic>;
+        }
+        return decoded;
       } else if (response.statusCode == 401) {
         throw Exception('Authentication required');
       } else {
+        // ... your existing error parsing stays the same
         try {
           final decoded = json.decode(response.body);
-
           if (decoded is Map<String, dynamic>) {
             if (decoded['error'] is String) {
               throw Exception(decoded['error']);
@@ -192,7 +199,6 @@ class ApiService {
             if (decoded['detail'] is String) {
               throw Exception(decoded['detail']);
             }
-
             final parts = <String>[];
             decoded.forEach((key, value) {
               if (value is List) {
@@ -201,12 +207,10 @@ class ApiService {
                 parts.add('$key: $value');
               }
             });
-
             if (parts.isNotEmpty) {
               throw Exception(parts.join(' | '));
             }
           }
-
           throw Exception(
               'Failed to create pre-inform (${response.statusCode})');
         } catch (inner) {
