@@ -427,6 +427,8 @@ def zonal_demand_alerts(request):
     }
 
     return render(request, "zonaladmin/demand.html", context)
+
+
 # --------------------------
 # 6b) DISPATCH SPARE BUS FROM ALERT
 # --------------------------
@@ -434,14 +436,15 @@ def zonal_demand_alerts(request):
 def dispatch_spare_bus(request, alert_id):
     """
     Zonal / central admin uses this page to convert an alert into
-    a real spare-bus schedule.
+    a real spare-bus schedule that starts from the overflow stop.
 
     - Takes a DemandAlert (usually prediction-based).
+    - Identifies the overflow stop from the alert.
     - Lets admin pick:
         * Spare bus (from idle, active buses)
         * Driver
         * Date & departure time
-    - Creates a new Schedule.
+    - Creates a new Schedule with starting_stop_sequence set to overflow stop.
     - Marks bus as running and links it to that schedule.
     - Marks alert as 'dispatched' + updates admin_notes.
     """
@@ -458,6 +461,8 @@ def dispatch_spare_bus(request, alert_id):
             return redirect("zonal-demand")
 
     route = alert.stop.route
+    overflow_stop = alert.stop  # 🔥 This is where the overflow occurs
+    
     # Default date: alert creation date (or today fallback)
     alert_date = getattr(alert, "created_at", None)
     if alert_date is not None:
@@ -473,6 +478,11 @@ def dispatch_spare_bus(request, alert_id):
         drivers = CustomUser.objects.filter(role="driver", zone=user.zone)
     else:
         drivers = CustomUser.objects.filter(role="driver")
+
+    # Remaining stops from overflow point
+    remaining_stops = route.stops.filter(
+        sequence__gte=overflow_stop.sequence
+    ).order_by('sequence')
 
     error = None
 
@@ -510,51 +520,68 @@ def dispatch_spare_bus(request, alert_id):
             bus_obj = get_object_or_404(Bus, id=bus_id)
             driver_obj = get_object_or_404(CustomUser, id=driver_id, role="driver")
 
-            # Create the spare schedule  🔹 mark as spare + link to alert
-            schedule = Schedule.objects.create(
-                route=route,
+            # 🔥 CHECK IF SCHEDULE ALREADY EXISTS
+            existing_schedule = Schedule.objects.filter(
                 bus=bus_obj,
-                driver=driver_obj,
                 date=sched_date,
-                departure_time=departure_time,
-                arrival_time=arrival_time or departure_time,
-                total_seats=bus_obj.capacity,
-                available_seats=bus_obj.capacity,
-                is_spare_trip=True,
-                source_alert=alert,
-            )
+                departure_time=departure_time
+            ).first()
 
-            # Mark bus as running on this route/schedule
-            bus_obj.is_running = True
-            bus_obj.current_route = route
-            bus_obj.current_schedule = schedule
-            bus_obj.save(
-                update_fields=[
-                    "is_running",
-                    "current_route",
-                    "current_schedule",
-                ]
-            )
-
-            # Update alert status & notes
-            if hasattr(alert, "status"):
-                alert.status = "dispatched"
-
-            extra_note = (
-                f" Spare bus {bus_obj.number_plate} dispatched "
-                f"(schedule #{schedule.id})."
-            )
-            if alert.admin_notes:
-                alert.admin_notes = alert.admin_notes + extra_note
+            if existing_schedule:
+                error = (
+                    f"Bus {bus_obj.number_plate} already has a schedule "
+                    f"on {sched_date} at {departure_time}. "
+                    f"Choose a different time or bus."
+                )
             else:
-                alert.admin_notes = extra_note
-            alert.save(
-                update_fields=["admin_notes"]
-                + (["status"] if hasattr(alert, "status") else [])
-            )
+                # 🔥 Create the spare schedule starting from overflow stop
+                schedule = Schedule.objects.create(
+                    route=route,
+                    bus=bus_obj,
+                    driver=driver_obj,
+                    date=sched_date,
+                    departure_time=departure_time,
+                    arrival_time=arrival_time or departure_time,
+                    total_seats=bus_obj.capacity,
+                    available_seats=bus_obj.capacity,
+                    current_stop_sequence=overflow_stop.sequence,  # Current position (will change)
+                    starting_stop_sequence=overflow_stop.sequence,  # 🔥 ORIGINAL START (never changes)
+                    is_spare_trip=True,
+                    source_alert=alert,
+                )
 
-            # Back to demand list
-            return redirect("zonal-demand")
+                # Mark bus as running on this route/schedule (NO GPS)
+                bus_obj.is_running = True
+                bus_obj.current_route = route
+                bus_obj.current_schedule = schedule
+                bus_obj.save(
+                    update_fields=[
+                        "is_running",
+                        "current_route",
+                        "current_schedule",
+                    ]
+                )
+
+                # Update alert status & notes
+                if hasattr(alert, "status"):
+                    alert.status = "dispatched"
+
+                extra_note = (
+                    f" Spare bus {bus_obj.number_plate} dispatched "
+                    f"from stop '{overflow_stop.name}' (seq: {overflow_stop.sequence}) "
+                    f"(schedule #{schedule.id})."
+                )
+                if alert.admin_notes:
+                    alert.admin_notes = alert.admin_notes + extra_note
+                else:
+                    alert.admin_notes = extra_note
+                alert.save(
+                    update_fields=["admin_notes"]
+                    + (["status"] if hasattr(alert, "status") else [])
+                )
+
+                # Back to demand list
+                return redirect("zonal-demand")
 
     # Default suggested departure time = now (HH:MM)
     initial_departure = timezone.localtime().strftime("%H:%M")
@@ -563,6 +590,8 @@ def dispatch_spare_bus(request, alert_id):
         "user": user,
         "alert": alert,
         "route": route,
+        "overflow_stop": overflow_stop,  # 🔥 Pass to template
+        "remaining_stops": remaining_stops,  # 🔥 Pass to template
         "selected_date": selected_date,
         "buses": buses,
         "drivers": drivers,
@@ -571,8 +600,6 @@ def dispatch_spare_bus(request, alert_id):
     }
 
     return render(request, "zonaladmin/dispatch_spare_bus.html", context)
-
-
 # --------------------------
 # 7) ROUTES PAGE
 # --------------------------
@@ -636,9 +663,101 @@ def schedule_load_prediction(request, schedule_id):
             },
         )
 
+    # 🔥 Add starting_stop_sequence to context
     context = {
         "schedule": schedule,
         "data": data,
+        "starting_sequence": getattr(schedule, "starting_stop_sequence", 0) or 0,  # 🔥 ORIGINAL start
+        "current_sequence": getattr(schedule, "current_stop_sequence", 0) or 0,    # 🔥 Current position
     }
 
     return render(request, "zonaladmin/schedule_load.html", context)
+
+# Add to zonaladmin/views.py
+
+@login_required
+def verify_schedule_view(request, schedule_id):
+    """
+    Detailed view to verify a schedule, especially spare buses.
+    Shows starting point, route coverage, and all related info.
+    Uses starting_stop_sequence (never changes) instead of current_stop_sequence (changes as bus moves).
+    """
+    user = request.user
+    
+    schedule = get_object_or_404(
+        Schedule.objects.select_related("route", "bus", "driver"),
+        id=schedule_id,
+    )
+    
+    # Zonal admin: ensure it belongs to their zone
+    if getattr(user, "role", None) == "zonal_admin" and getattr(user, "zone_id", None):
+        if schedule.route.zone_id != user.zone_id:
+            return redirect("zonal-schedules")
+    
+    route = schedule.route
+    
+    # Get all stops for this route
+    all_stops = route.stops.all().order_by("sequence")
+    
+    # 🔥 USE starting_stop_sequence (ORIGINAL start point that never changes)
+    start_seq = getattr(schedule, "starting_stop_sequence", 0) or 0
+    
+    # 🔥 ALSO get current position (where bus is NOW)
+    current_seq = getattr(schedule, "current_stop_sequence", 0) or 0
+    
+    if start_seq > 0:
+        # Spare bus or mid-route schedule - show stops from ORIGINAL start
+        serving_stops = all_stops.filter(sequence__gte=start_seq)
+        skipped_stops = all_stops.filter(sequence__lt=start_seq)
+    else:
+        # Regular full-route schedule
+        serving_stops = all_stops
+        skipped_stops = []
+    
+    # Get the starting stop (based on ORIGINAL start)
+    starting_stop = all_stops.filter(sequence=start_seq).first() if start_seq > 0 else None
+    
+    # Get current stop (where bus is NOW)
+    current_stop = all_stops.filter(sequence=current_seq).first() if current_seq > 0 else None
+    
+    context = {
+        "user": user,
+        "schedule": schedule,
+        "route": route,
+        "all_stops": all_stops,
+        "serving_stops": serving_stops,
+        "skipped_stops": skipped_stops,
+        "starting_stop": starting_stop,  # ORIGINAL start
+        "current_stop": current_stop,    # Current position
+        "start_sequence": start_seq,     # 🔥 ORIGINAL starting point (never changes)
+        "current_sequence": current_seq, # 🔥 Current position (changes as bus moves)
+        "is_spare": getattr(schedule, "is_spare_trip", False),
+        "source_alert": getattr(schedule, "source_alert", None),
+    }
+    
+    return render(request, "zonaladmin/verify_schedule.html", context)
+
+# Also add this helper to the schedules list page
+@login_required
+def zonal_schedules(request):
+    """Enhanced schedules list with spare bus indicators"""
+    user = request.user
+    schedules = filter_zone(
+        Schedule.objects.select_related("route", "bus", "driver")
+        .prefetch_related("route__stops"),
+        user,
+    ).order_by("date", "departure_time")
+    
+    # Annotate each schedule with starting stop info
+    for schedule in schedules:
+        start_seq = getattr(schedule, "current_stop_sequence", 0) or 0
+        if start_seq > 0:
+            schedule.starting_stop = (
+                schedule.route.stops
+                .filter(sequence=start_seq)
+                .first()
+            )
+        else:
+            schedule.starting_stop = None
+
+    return render(request, "zonaladmin/schedules.html", {"schedules": schedules})

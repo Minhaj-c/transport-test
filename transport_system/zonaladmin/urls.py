@@ -25,4 +25,5 @@ urlpatterns = [
 
     # Spare bus action (added in phase 2)
     path("demand/dispatch/<int:alert_id>/", views.dispatch_spare_bus, name="zonal-dispatch-spare"),
+    path('schedules/<int:schedule_id>/verify/', views.verify_schedule_view, name='verify-schedule'),
 ]

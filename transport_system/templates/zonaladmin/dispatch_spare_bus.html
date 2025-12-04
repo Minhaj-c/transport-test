@@ -11,6 +11,8 @@
             --text-main: #111827;
             --text-muted: #6b7280;
             --accent: #2563eb;
+            --warning: #f59e0b;
+            --success: #10b981;
         }
 
         * { box-sizing: border-box; }
@@ -42,6 +44,16 @@
             margin-bottom: 16px;
         }
 
+        .card-warning {
+            border-left: 4px solid var(--warning);
+            background: #fffbeb;
+        }
+
+        .card-info {
+            border-left: 4px solid var(--accent);
+            background: #eff6ff;
+        }
+
         .title {
             font-size: 18px;
             font-weight: 600;
@@ -71,6 +83,39 @@
         .value {
             font-size: 13px;
             font-weight: 500;
+        }
+
+        .highlight-box {
+            background: #fef3c7;
+            border: 1px solid #fbbf24;
+            border-radius: 6px;
+            padding: 10px 12px;
+            margin: 12px 0;
+        }
+
+        .highlight-box strong {
+            color: #92400e;
+        }
+
+        .stops-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid var(--border-soft);
+            border-radius: 6px;
+            padding: 8px;
+            margin: 8px 0;
+            font-size: 12px;
+        }
+
+        .stops-list li {
+            padding: 4px 0;
+        }
+
+        .stops-list .start-here {
+            background: #fef3c7;
+            font-weight: 600;
+            padding: 4px 6px;
+            border-radius: 4px;
         }
 
         form .field {
@@ -134,6 +179,19 @@
             font-size: 11px;
             font-weight: 500;
         }
+
+        .info-icon {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            background: var(--accent);
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 16px;
+            font-size: 11px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -143,17 +201,28 @@
         <a href="{% url 'zonal-demand' %}">&larr; Back to Demand Alerts</a>
     </p>
 
-    <div class="card">
-        <h1 class="title">Dispatch Spare Bus</h1>
+    <!-- Alert Overview -->
+    <div class="card card-warning">
+        <h1 class="title">⚠️ Dispatch Spare Bus</h1>
         <p class="subtitle">
-            You are adding an extra bus for this crowded point.
+            Overflow detected on {{ route.number }} – {{ route.name }}
         </p>
 
         <div class="summary-grid">
             <div>
-                <div class="label">Route</div>
+                <div class="label">Overflow Location</div>
                 <div class="value">
-                    {{ route.number }} – {{ route.name }}
+                    {{ overflow_stop.name }}
+                    <small style="color: var(--text-muted);">(Stop #{{ overflow_stop.sequence }})</small>
+                </div>
+            </div>
+            <div>
+                <div class="label">Expected Passengers</div>
+                <div class="value">
+                    {{ alert.number_of_people }}
+                    {% if alert.get_level %}
+                        &nbsp; <span class="badge-level-high">{{ alert.get_level|title }}</span>
+                    {% endif %}
                 </div>
             </div>
             <div>
@@ -163,38 +232,61 @@
                 </div>
             </div>
             <div>
-                <div class="label">Crowded at stop</div>
+                <div class="label">Remaining Stops</div>
                 <div class="value">
-                    {{ alert.stop.name }}
-                </div>
-            </div>
-            <div>
-                <div class="label">Expected people after this stop</div>
-                <div class="value">
-                    {{ alert.number_of_people }}
-                    {% if alert.get_level %}
-                        &nbsp; <span class="badge-level-high">{{ alert.get_level|title }}</span>
-                    {% endif %}
+                    {{ remaining_stops.count }} stops to serve
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Route Coverage Info -->
+    <div class="card card-info">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+            <span class="info-icon">i</span>
+            <strong style="font-size: 14px;">Spare Bus Route Coverage</strong>
+        </div>
+        
+        <div class="highlight-box">
+            <p style="margin: 0 0 4px; font-size: 13px;">
+                <strong>🚌 The spare bus will START from:</strong><br>
+                {{ overflow_stop.name }} (Stop #{{ overflow_stop.sequence }})
+            </p>
+            <p style="margin: 4px 0 0; font-size: 12px; color: var(--text-muted);">
+                It will only serve stops from the overflow point to the destination.
+            </p>
+        </div>
+
+        <details style="margin-top: 10px;">
+            <summary style="cursor: pointer; font-size: 12px; color: var(--accent);">
+                📍 View all {{ remaining_stops.count }} stops this bus will serve
+            </summary>
+            <ol class="stops-list" start="{{ overflow_stop.sequence }}">
+                {% for stop in remaining_stops %}
+                <li {% if forloop.first %}class="start-here"{% endif %}>
+                    {{ stop.name }}
+                    {% if forloop.first %}<strong> ← START HERE</strong>{% endif %}
+                </li>
+                {% endfor %}
+            </ol>
+        </details>
+    </div>
+
+    <!-- Dispatch Form -->
     <div class="card">
         <p class="subtitle" style="margin-bottom:10px;">
-            Choose a spare bus, driver, and departure time. We create a new
-            <strong>Schedule</strong> starting on this route.
+            Choose a spare bus, driver, and departure time to create a new schedule.
         </p>
 
         {% if error %}
-            <div class="error">{{ error }}</div>
+            <div class="error">⚠️ {{ error }}</div>
         {% endif %}
 
         <form method="post">
             {% csrf_token %}
 
             <div class="field">
-                <label for="bus_id">Spare Bus</label>
+                <label for="bus_id">Spare Bus *</label>
                 <select name="bus_id" id="bus_id" required>
                     <option value="">-- Select spare bus --</option>
                     {% for bus in buses %}
@@ -208,7 +300,7 @@
             </div>
 
             <div class="field">
-                <label for="driver_id">Driver</label>
+                <label for="driver_id">Driver *</label>
                 <select name="driver_id" id="driver_id" required>
                     <option value="">-- Select driver --</option>
                     {% for d in drivers %}
@@ -223,7 +315,7 @@
             </div>
 
             <div class="field">
-                <label for="date">Service date</label>
+                <label for="date">Service Date *</label>
                 <input
                     type="date"
                     id="date"
@@ -234,7 +326,7 @@
             </div>
 
             <div class="field">
-                <label for="departure_time">Departure time (start of spare trip)</label>
+                <label for="departure_time">Departure Time * (from {{ overflow_stop.name }})</label>
                 <input
                     type="time"
                     id="departure_time"
@@ -242,11 +334,14 @@
                     value="{{ initial_departure }}"
                     required
                 >
+                <small style="font-size: 11px; color: var(--text-muted);">
+                    When the spare bus will depart from Stop #{{ overflow_stop.sequence }}
+                </small>
             </div>
 
             <div class="field">
                 <label for="arrival_time">
-                    Arrival time (optional – you can adjust later on schedule page)
+                    Arrival Time (optional – estimated arrival at final destination)
                 </label>
                 <input
                     type="time"
@@ -258,7 +353,7 @@
             <div class="actions">
                 <a href="{% url 'zonal-demand' %}" class="btn btn-secondary">Cancel</a>
                 <button type="submit" class="btn btn-primary">
-                    Create spare bus schedule
+                    🚌 Dispatch Spare Bus
                 </button>
             </div>
         </form>

@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Verify Schedule #{{ schedule.id }} – {{ schedule.route.number }}</title>
+    <style>
+        :root {
+            --bg-page: #eef1f7;
+            --bg-card: #ffffff;
+            --border-soft: #e5e7eb;
+            --text-main: #111827;
+            --text-muted: #6b7280;
+            --accent: #004aad;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background: var(--bg-page);
+            color: var(--text-main);
+        }
+
+        .header {
+            background: var(--accent);
+            padding: 18px 30px;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .header h2 { margin: 0; font-size: 20px; }
+        .header a {
+            color: #dbe7ff;
+            text-decoration: none;
+            margin-left: 16px;
+            font-size: 14px;
+        }
+        .header a:hover { text-decoration: underline; }
+
+        .page {
+            width: 94%;
+            max-width: 1000px;
+            margin: 24px auto 40px;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 12px;
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 13px;
+        }
+        .back-link:hover { text-decoration: underline; }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: 10px;
+            border: 1px solid var(--border-soft);
+            padding: 18px 20px;
+            box-shadow: 0 2px 6px rgba(15,23,42,0.08);
+            margin-bottom: 18px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 14px;
+        }
+
+        .title {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0 0 4px;
+        }
+
+        .subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin: 0;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .badge-spare {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-regular {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+        }
+
+        .stat-box {
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-soft);
+            background: #f9fafb;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+            letter-spacing: 0.03em;
+        }
+
+        .stat-value {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .alert-box {
+            background: #fffbeb;
+            border: 2px solid #fbbf24;
+            border-radius: 8px;
+            padding: 14px 16px;
+            margin: 14px 0;
+        }
+
+        .alert-box strong {
+            font-size: 14px;
+            color: #92400e;
+        }
+
+        .info-box {
+            background: #eff6ff;
+            border: 1px solid #60a5fa;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 12px 0;
+            font-size: 13px;
+        }
+
+        .stops-comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 14px;
+        }
+
+        .stop-list {
+            border: 1px solid var(--border-soft);
+            border-radius: 8px;
+            padding: 14px;
+            max-height: 350px;
+            overflow-y: auto;
+            background: #fafafa;
+        }
+
+        .stop-list h4 {
+            margin: 0 0 10px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .stop-item {
+            padding: 7px 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+            font-size: 12px;
+        }
+
+        .stop-serving {
+            background: #d1fae5;
+            border-left: 3px solid var(--success);
+        }
+
+        .stop-skipped {
+            background: #fee2e2;
+            border-left: 3px solid var(--danger);
+            opacity: 0.7;
+        }
+
+        .starting-point {
+            background: #fef3c7;
+            border: 2px solid var(--warning);
+            font-weight: 600;
+        }
+
+        .current-point {
+            background: #dbeafe;
+            border: 2px solid #2563eb;
+            font-weight: 600;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            margin-top: 10px;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 10px;
+            border-bottom: 1px solid var(--border-soft);
+        }
+
+        th {
+            font-weight: 600;
+            color: var(--text-muted);
+            font-size: 11px;
+            text-transform: uppercase;
+            background: #f9fafb;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 16px;
+        }
+
+        .btn {
+            padding: 9px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            display: inline-block;
+        }
+
+        .btn-secondary {
+            background: #e5e7eb;
+            color: #111827;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h2>Schedule Verification</h2>
+    <div>
+        <a href="/zonal-admin/">Dashboard</a>
+        <a href="/zonal-admin/schedules/">Schedules</a>
+        <a href="/zonal-admin/demand/">Demand Alerts</a>
+    </div>
+</div>
+
+<div class="page">
+    <a href="{% url 'zonal-schedules' %}" class="back-link">&larr; Back to Schedules</a>
+
+    <!-- Header Card -->
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h1 class="title">
+                    Schedule #{{ schedule.id }}
+                    {% if is_spare %}
+                        <span class="badge badge-spare">🚌 SPARE BUS</span>
+                    {% else %}
+                        <span class="badge badge-regular">Regular Service</span>
+                    {% endif %}
+                </h1>
+                <p class="subtitle">
+                    {{ route.number }} – {{ route.name }}
+                </p>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="stat-box">
+                <div class="stat-label">Bus</div>
+                <div class="stat-value">{{ schedule.bus.number_plate }}</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Driver</div>
+                <div class="stat-value">{{ schedule.driver.email|truncatechars:25 }}</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Date</div>
+                <div class="stat-value">{{ schedule.date }}</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Departure</div>
+                <div class="stat-value">{{ schedule.departure_time }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Starting Point Alert -->
+    {% if start_sequence > 0 %}
+    <div class="alert-box">
+        <strong>⚠️ This bus starts MID-ROUTE (Not from origin)</strong>
+        <p style="margin: 10px 0 4px; font-size: 13px;">
+            <strong>ORIGINAL Starting Point:</strong> {{ starting_stop.name }} (Stop #{{ start_sequence }})
+        </p>
+        {% if current_sequence != start_sequence %}
+        <div class="info-box" style="margin-top:8px;">
+            <strong>📍 Current Position:</strong> 
+            {% if current_stop %}
+                {{ current_stop.name }} (Stop #{{ current_sequence }})
+            {% else %}
+                Stop #{{ current_sequence }}
+            {% endif %}
+        </div>
+        {% endif %}
+        {% if source_alert %}
+        <p style="margin: 4px 0 0; font-size: 12px; color: var(--text-muted);">
+            <strong>Reason:</strong> {{ source_alert.admin_notes|truncatewords:20 }}
+        </p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Route Coverage Card -->
+    <div class="card">
+        <h3 style="margin: 0 0 14px; font-size: 16px;">📍 Route Coverage Analysis</h3>
+        
+        <div class="grid" style="margin-bottom: 16px;">
+            <div class="stat-box">
+                <div class="stat-label">Total Stops on Route</div>
+                <div class="stat-value">{{ all_stops.count }}</div>
+            </div>
+            <div class="stat-box" style="background: #d1fae5;">
+                <div class="stat-label">Stops Being Served</div>
+                <div class="stat-value" style="color: var(--success);">
+                    {{ serving_stops.count }}
+                </div>
+            </div>
+            <div class="stat-box" style="background: #fee2e2;">
+                <div class="stat-label">Stops Skipped</div>
+                <div class="stat-value" style="color: var(--danger);">
+                    {{ skipped_stops.count }}
+                </div>
+            </div>
+        </div>
+
+        <div class="stops-comparison">
+            <!-- Serving Stops -->
+            <div class="stop-list">
+                <h4 style="color: var(--success);">✓ Will Serve ({{ serving_stops.count }} stops)</h4>
+                {% for stop in serving_stops %}
+                <div class="stop-item 
+                    {% if stop.sequence == start_sequence %}starting-point
+                    {% elif stop.sequence == current_sequence %}current-point
+                    {% else %}stop-serving{% endif %}">
+                    #{{ stop.sequence }}: {{ stop.name }}
+                    {% if stop.sequence == start_sequence %}
+                        <strong>← ORIGINAL START</strong>
+                    {% elif stop.sequence == current_sequence %}
+                        <strong>← CURRENTLY HERE</strong>
+                    {% endif %}
+                </div>
+                {% empty %}
+                <p style="font-size: 12px; color: var(--text-muted); margin:0;">No stops to serve</p>
+                {% endfor %}
+            </div>
+
+            <!-- Skipped Stops -->
+            <div class="stop-list">
+                <h4 style="color: var(--danger);">✗ Skipped ({{ skipped_stops.count }} stops)</h4>
+                {% for stop in skipped_stops %}
+                <div class="stop-item stop-skipped">
+                    #{{ stop.sequence }}: {{ stop.name }}
+                </div>
+                {% empty %}
+                <p style="font-size: 12px; color: var(--text-muted); margin:0;">No stops skipped (full route)</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Schedule Details Card -->
+    <div class="card">
+        <h3 style="margin: 0 0 12px; font-size: 16px;">📊 Schedule Details</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Field</th>
+                    <th>Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Total Seats</td>
+                    <td><strong>{{ schedule.total_seats }}</strong></td>
+                </tr>
+                <tr>
+                    <td>Available Seats</td>
+                    <td>{{ schedule.available_seats }}</td>
+                </tr>
+                <tr>
+                    <td>Current Passengers</td>
+                    <td>{{ schedule.current_passengers }}</td>
+                </tr>
+                <tr>
+                    <td>Original Starting Stop</td>
+                    <td>
+                        <strong style="color: var(--warning);">Stop #{{ start_sequence }}</strong>
+                        {% if starting_stop %}
+                            <span style="color: var(--text-muted);"> ({{ starting_stop.name }})</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td>Current Stop Position</td>
+                    <td>
+                        <strong style="color: #2563eb;">Stop #{{ current_sequence }}</strong>
+                        {% if current_stop %}
+                            <span style="color: var(--text-muted);"> ({{ current_stop.name }})</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td>Is Spare Trip</td>
+                    <td>
+                        {% if is_spare %}
+                            <span style="color: var(--warning); font-weight: 600;">YES ✓</span>
+                        {% else %}
+                            <span style="color: var(--text-muted);">No</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td>Bus Running Status</td>
+                    <td>
+                        {% if schedule.bus.is_running %}
+                            <span style="color: var(--success); font-weight: 600;">● Running</span>
+                        {% else %}
+                            <span style="color: var(--text-muted);">○ Not Started</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="actions">
+        <a href="{% url 'zonal-schedules' %}" class="btn btn-secondary">
+            ← Back to Schedules
+        </a>
+        <a href="{% url 'schedule-load-prediction' schedule.id %}" class="btn btn-primary">
+            📊 View Load Prediction
+        </a>
+    </div>
+</div>
+
+</body>
+</html>

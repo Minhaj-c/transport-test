@@ -42,6 +42,15 @@
             margin: 20px auto 40px;
         }
 
+        .back-link {
+            display: inline-block;
+            margin-bottom: 12px;
+            color: #2563eb;
+            text-decoration: none;
+            font-size: 13px;
+        }
+        .back-link:hover { text-decoration: underline; }
+
         .card {
             background: #ffffff;
             border-radius: 10px;
@@ -60,6 +69,20 @@
             font-size: 12px;
             color: #6b7280;
             margin-bottom: 8px;
+        }
+
+        /* Badge for spare bus */
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+        .badge-spare {
+            background: #fef3c7;
+            color: #92400e;
         }
 
         .summary-grid {
@@ -90,7 +113,20 @@
             color: #6b7280;
         }
 
-        .badge {
+        /* Alert box for spare bus info */
+        .info-box {
+            background: #eff6ff;
+            border: 1px solid #60a5fa;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 12px 0;
+            font-size: 13px;
+        }
+        .info-box strong {
+            color: #1e40af;
+        }
+
+        .badge-status {
             display: inline-block;
             padding: 2px 7px;
             font-size: 11px;
@@ -144,6 +180,25 @@
             color: #b91c1c;
             font-weight: 600;
         }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 14px;
+        }
+        .btn {
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            text-decoration: none;
+            border: none;
+        }
+        .btn-secondary {
+            background: #e5e7eb;
+            color: #111827;
+        }
+        .btn:hover { opacity: 0.9; }
     </style>
 </head>
 <body>
@@ -164,19 +219,42 @@
 </div>
 
 <div class="container">
+    <a href="{% url 'zonal-schedules' %}" class="back-link">&larr; Back to Schedules</a>
 
     {% if error %}
         <div class="card">
-            <p class="capacity-over">{{ error }}</p>
+            <p class="capacity-over">❌ {{ error }}</p>
         </div>
     {% else %}
         <div class="card">
-            <div class="title">Schedule Summary</div>
+            <div class="title">
+                Schedule Summary
+                {% if schedule.is_spare_trip %}
+                    <span class="badge badge-spare">🚌 SPARE BUS</span>
+                {% endif %}
+            </div>
             <div class="subtitle">
                 Date: {{ schedule.date }} · 
                 Departure: {{ schedule.departure_time }} ·
                 Bus: {{ schedule.bus.number_plate }}
             </div>
+
+            <!-- Spare Bus Info -->
+            {% if schedule.is_spare_trip and starting_sequence > 0 %}
+            <div class="info-box">
+                <strong>ℹ️ Spare Bus Information:</strong><br>
+                This spare bus <strong>originally started from Stop #{{ starting_sequence }}</strong> 
+                and serves stops from that point onwards.
+                {% if current_sequence != starting_sequence %}
+                <br><small style="color:#6b7280;">
+                    Currently at: Stop #{{ current_sequence }}
+                </small>
+                {% endif %}
+                {% if schedule.source_alert %}
+                <br><small>Dispatched due to: {{ schedule.source_alert.admin_notes|truncatewords:15 }}</small>
+                {% endif %}
+            </div>
+            {% endif %}
 
             <div class="summary-grid">
                 <div class="summary-item">
@@ -185,29 +263,48 @@
                 </div>
 
                 <div class="summary-item">
-                    <div class="summary-label">Passengers already inside</div>
-                    <div class="summary-value">{{ data.base_inside }}</div>
+                    <div class="summary-label">Current Passengers</div>
+                    <div class="summary-value">{{ data.base_passengers }}</div>
                     <div class="summary-hint">
-                        From driver app (current_passengers)
+                        {% if schedule.is_spare_trip and starting_sequence > 0 %}
+                            Spare bus (starts empty)
+                        {% else %}
+                            From driver app
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="summary-item">
+                    <div class="summary-label">
+                        {% if starting_sequence > 0 %}Original Start{% else %}Current Position{% endif %}
+                    </div>
+                    <div class="summary-value">
+                        Stop #{{ starting_sequence|default:"0" }}
+                    </div>
+                    <div class="summary-hint">
+                        {% if schedule.is_spare_trip %}
+                            Where bus was dispatched
+                        {% else %}
+                            Route origin
+                        {% endif %}
                     </div>
                 </div>
 
                 <div class="summary-item">
                     <div class="summary-label">Prediction Result</div>
-                    {% if data.will_overflow %}
+                    {% if data.overflow_stop %}
                         <div class="summary-value capacity-over">
                             Will overflow
                         </div>
                         <div class="summary-hint">
-                            First at {{ data.first_overflow_stop.name }}
-                            (+{{ data.overflow_amount }} over capacity)
+                            At {{ data.overflow_stop.name }}
                         </div>
                     {% else %}
                         <div class="summary-value capacity-ok">
-                            Within capacity
+                            Within capacity ✓
                         </div>
                         <div class="summary-hint">
-                            No stop exceeds {{ data.capacity }} seats
+                            No overflow expected
                         </div>
                     {% endif %}
                 </div>
@@ -215,55 +312,80 @@
         </div>
 
         <div class="card">
-            <div class="title">Per-Stop Expected Load</div>
+            <div class="title">
+                Per-Stop Expected Load
+                {% if starting_sequence > 0 %}
+                    <small style="font-weight:normal; color:#6b7280;">
+                        (Showing stops from #{{ starting_sequence }} onwards)
+                    </small>
+                {% endif %}
+            </div>
             <div class="subtitle">
-                Combines live bus count + PENDING / NOTED pre-informs per stop.
+                Combines current passenger count + NOTED pre-informs for boarding & alighting.
             </div>
 
             <table>
                 <thead>
                     <tr>
-                        <th>#</th>
+                        <th>Seq #</th>
                         <th>Stop</th>
-                        <th>Pre-Informed Boarding</th>
-                        <th>Expected Load on Arrival</th>
-                        <th>Capacity Status</th>
+                        <th>Boarding</th>
+                        <th>Alighting</th>
+                        <th>Expected Load</th>
+                        <th>Status</th>
                     </tr>
                 </thead>
                 <tbody>
                 {% for row in data.stops %}
-                    {% with stop=row.stop boarding=row.boarding load=row.expected_load %}
                     <tr>
-                        <td>{{ stop.sequence }}</td>
-                        <td>{{ stop.name }}</td>
-                        <td>{{ boarding }}</td>
-                        <td>{{ load }}</td>
+                        <td>{{ row.stop.sequence }}</td>
                         <td>
-                            {% if load > data.capacity %}
-                                <span class="badge badge-danger">
+                            {{ row.stop.name }}
+                            {% if row.stop.sequence == starting_sequence and schedule.is_spare_trip %}
+                                <strong style="color:#f59e0b;"> ← ORIGINAL START</strong>
+                            {% endif %}
+                            {% if row.stop.sequence == current_sequence %}
+                                <strong style="color:#2563eb;"> ← NOW HERE</strong>
+                            {% endif %}
+                        </td>
+                        <td>+{{ row.boarding }}</td>
+                        <td>-{{ row.alighting }}</td>
+                        <td><strong>{{ row.expected_load }}</strong></td>
+                        <td>
+                            {% if row.expected_load > data.capacity %}
+                                <span class="badge-status badge-danger">
                                     Over capacity
                                 </span>
-                            {% elif load|add:"5" >= data.capacity %}
-                                <span class="badge badge-warn">
+                            {% elif row.expected_load|add:"5" >= data.capacity %}
+                                <span class="badge-status badge-warn">
                                     Nearly full
                                 </span>
                             {% else %}
-                                <span class="badge badge-ok">
+                                <span class="badge-status badge-ok">
                                     OK
                                 </span>
                             {% endif %}
                         </td>
                     </tr>
-                    {% endwith %}
                 {% empty %}
                     <tr>
-                        <td colspan="5" class="muted">
-                            No stops found for this route.
+                        <td colspan="6" class="muted" style="text-align:center; padding:20px;">
+                            No future stops to analyze.
                         </td>
                     </tr>
                 {% endfor %}
                 </tbody>
             </table>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="actions">
+            <a href="{% url 'zonal-schedules' %}" class="btn btn-secondary">
+                ← Back to Schedules
+            </a>
+            <a href="{% url 'verify-schedule' schedule.id %}" class="btn btn-secondary">
+                🔍 Verify Schedule
+            </a>
         </div>
     {% endif %}
 

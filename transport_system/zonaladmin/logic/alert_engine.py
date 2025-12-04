@@ -102,6 +102,8 @@ def compute_bus_load_for_schedule(schedule):
       up to (but NOT including) dropoff_stop.sequence.
     - If driver has set current_stop_sequence, we only look at stops
       with sequence > current_stop_sequence.
+    - If schedule is partial (start_stop_sequence / end_stop_sequence),
+      we only consider that segment of the route.
     """
 
     route = schedule.route
@@ -111,10 +113,20 @@ def compute_bus_load_for_schedule(schedule):
     base = schedule.current_passengers or 0
     current_seq = getattr(schedule, "current_stop_sequence", 0) or 0
 
-    # All stops in order; only future ones if current_seq set
+    # 🔥 partial trip range
+    start_seq = getattr(schedule, "start_stop_sequence", 1) or 1
+    end_seq = getattr(schedule, "end_stop_sequence", None)
+
+    # Bus cannot be before its logical start
+    effective_current_seq = current_seq
+    if effective_current_seq < start_seq:
+        effective_current_seq = start_seq - 1
+
+    # All stops in order; only future ones in this schedule segment
     stops_qs = Stop.objects.filter(route=route).order_by("sequence")
-    if current_seq:
-        stops_qs = stops_qs.filter(sequence__gt=current_seq)
+    stops_qs = stops_qs.filter(sequence__gt=effective_current_seq)
+    if end_seq is not None:
+        stops_qs = stops_qs.filter(sequence__lte=end_seq)
     stops = list(stops_qs)
 
     # All NOTED pre-informs for this route + date
@@ -137,12 +149,14 @@ def compute_bus_load_for_schedule(schedule):
         d_stop = getattr(pi, "dropoff_stop", None)
         d_seq = d_stop.sequence if d_stop else None
 
-        # People who board AFTER our current position
-        if b_seq > current_seq:
+        # People who board in THIS schedule segment, after the current point
+        if b_seq > effective_current_seq and (end_seq is None or b_seq <= end_seq):
             board_map[b_seq] = board_map.get(b_seq, 0) + count
 
-        # People who will get down AFTER our current position
-        if d_seq is not None and d_seq > current_seq:
+        # People who alight in THIS schedule segment, after the current point
+        if d_seq is not None and d_seq > effective_current_seq and (
+            end_seq is None or d_seq <= end_seq
+        ):
             drop_map[d_seq] = drop_map.get(d_seq, 0) + count
 
     load = base
@@ -182,8 +196,8 @@ def compute_bus_load_for_schedule(schedule):
         "max_load": max_load,
         "overflow_stop": overflow_stop,
     }
-    
-    
+
+
 def debug_print_bus_load_for_schedule(schedule):
     """
     Helper for Django shell (does NOT touch DB).
@@ -198,8 +212,10 @@ def debug_print_bus_load_for_schedule(schedule):
     print(f"=== Bus Load Prediction for Schedule #{schedule.id} ===")
     print(f"Route: {route.number} – {route.name}")
     print(f"Date: {schedule.date}")
-    print(f"Bus: {schedule.bus.number_plate if schedule.bus else 'N/A'} "
-          f"(capacity {capacity})")
+    print(
+        f"Bus: {schedule.bus.number_plate if schedule.bus else 'N/A'} "
+        f"(capacity {capacity})"
+    )
     print(f"Base passengers already inside: {base}")
     print("-" * 55)
 
@@ -232,7 +248,7 @@ def generate_prediction_alerts(for_date=None, zone=None):
     """
     NEW:
 
-    - For each schedule on given date (+zone)
+    - For each NON-SPARE schedule on given date (+zone)
     - Compute expected load at each stop
     - If expected_load > capacity at some stop,
       create ONE DemandAlert for the FIRST overflow stop.
@@ -241,9 +257,11 @@ def generate_prediction_alerts(for_date=None, zone=None):
     if for_date is None:
         for_date = timezone.localdate()
 
-    qs = Schedule.objects.filter(date=for_date).select_related(
-        "route", "bus", "driver"
-    )
+    qs = Schedule.objects.filter(
+        date=for_date,
+        is_spare_trip=False,   # 🔥 DO NOT generate alerts for spare buses
+    ).select_related("route", "bus", "driver")
+
     if zone is not None:
         qs = qs.filter(route__zone=zone)
 

@@ -160,10 +160,17 @@ class Schedule(models.Model):
     current_stop_sequence = models.PositiveIntegerField(
         default=0,
         blank=True,
-        help_text="Sequence number of the current stop in the route",
+        help_text="Sequence number of the current stop in the route (changes as bus moves)",
+    )
+    
+    # 🔥 NEW FIELD: Remember where the bus ORIGINALLY started
+    starting_stop_sequence = models.PositiveIntegerField(
+        default=0,
+        blank=True,
+        help_text="Original starting stop sequence (never changes after dispatch)",
     )
 
-    # 🔥 NEW FIELDS: mark spare-bus trips
+    # 🔥 SPARE BUS FIELDS
     is_spare_trip = models.BooleanField(
         default=False,
         help_text="True if this schedule was created as a spare bus from a demand alert.",
@@ -235,7 +242,6 @@ class Schedule(models.Model):
                 "available_seats",
             ]
         )
-
 
 class BusSchedule(models.Model):
     """

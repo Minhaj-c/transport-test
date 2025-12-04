@@ -25,6 +25,7 @@
                 border-radius:8px; overflow:hidden; }
         th {
             background:#dfe4ea; padding:10px; text-align:left; font-size:13px;
+            font-weight:600;
         }
         td {
             padding:9px 10px; border-bottom:1px solid #e3e3e3; font-size:13px;
@@ -37,6 +38,7 @@
             text-decoration:none; background:#0275d8; color:white;
             font-size:13px; margin-bottom:10px;
         }
+        .btn-primary:hover { background:#025aa5; }
 
         /* Trip-type pill */
         .tag {
@@ -63,6 +65,34 @@
             font-size:10px;
             opacity:0.8;
         }
+
+        /* Starting point indicator */
+        .start-point {
+            font-size:12px;
+            color:#f59e0b;
+            font-weight:600;
+        }
+        .start-point-origin {
+            font-size:12px;
+            color:#6b7280;
+        }
+        .start-location {
+            display:block;
+            font-size:11px;
+            color:#6b7280;
+            margin-top:2px;
+        }
+
+        /* Action links */
+        .action-link {
+            color:#2563eb;
+            text-decoration:none;
+            font-size:12px;
+            margin-right:10px;
+        }
+        .action-link:hover {
+            text-decoration:underline;
+        }
     </style>
 </head>
 <body>
@@ -78,43 +108,82 @@
 
 <div class="container">
     <div class="card">
-        <a href="/zonal-admin/assign-bus/" class="btn-primary">Assign New Bus</a>
+        <a href="/zonal-admin/assign-bus/" class="btn-primary">+ Assign New Bus</a>
 
         <table>
-            <tr>
-                <th>Bus</th>
-                <th>Route</th>
-                <th>Date</th>
-                <th>Departure</th>
-                <th>Arrival</th>
-                <th>Driver</th>
-                <th>Trip Type</th>
-            </tr>
-
-            {% for s in schedules %}
-            <tr>
-                <td>{{ s.bus.number_plate }}</td>
-                <td>{{ s.route.number }} – {{ s.route.name }}</td>
-                <td>{{ s.date }}</td>
-                <td>{{ s.departure_time }}</td>
-                <td>{{ s.arrival_time }}</td>
-                <td>{{ s.driver.email }}</td>
-                <td>
-                    {% if s.is_spare_trip %}
-                        <span class="tag tag-spare">
-                            Spare bus
-                            {% if s.source_alert %}
-                                <small>(from alert #{{ s.source_alert.id }})</small>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Bus</th>
+                    <th>Route</th>
+                    <th>Date</th>
+                    <th>Departure</th>
+                    <th>Arrival</th>
+                    <th>Driver</th>
+                    <th>Type</th>
+                    <th>Starting Point</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in schedules %}
+                <tr>
+                    <td>{{ s.id }}</td>
+                    <td>{{ s.bus.number_plate }}</td>
+                    <td>{{ s.route.number }} – {{ s.route.name }}</td>
+                    <td>{{ s.date }}</td>
+                    <td>{{ s.departure_time }}</td>
+                    <td>{{ s.arrival_time }}</td>
+                    <td>{{ s.driver.email|truncatechars:20 }}</td>
+                    
+                    <!-- Trip Type -->
+                    <td>
+                        {% if s.is_spare_trip %}
+                            <span class="tag tag-spare">
+                                🚌 Spare
+                                {% if s.source_alert %}
+                                    <small>(alert #{{ s.source_alert.id }})</small>
+                                {% endif %}
+                            </span>
+                        {% else %}
+                            <span class="tag tag-regular">Regular</span>
+                        {% endif %}
+                    </td>
+                    
+                    <!-- Starting Point -->
+                    <td>
+                        {% if s.current_stop_sequence > 0 %}
+                            <span class="start-point">
+                                Stop #{{ s.current_stop_sequence }}
+                            </span>
+                            {% if s.starting_stop %}
+                                <span class="start-location">
+                                    {{ s.starting_stop.name }}
+                                </span>
                             {% endif %}
-                        </span>
-                    {% else %}
-                        <span class="tag tag-regular">Regular trip</span>
-                    {% endif %}
-                </td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="7">No schedules defined.</td></tr>
-            {% endfor %}
+                        {% else %}
+                            <span class="start-point-origin">Origin</span>
+                        {% endif %}
+                    </td>
+                    
+                    <!-- Actions -->
+                    <td>
+                        <a href="{% url 'verify-schedule' s.id %}" class="action-link">
+                            🔍 Verify
+                        </a>
+                        <a href="{% url 'schedule-load-prediction' s.id %}" class="action-link">
+                            📊 Forecast
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="10" style="text-align:center; color:#6b7280; padding:20px;">
+                        No schedules defined yet.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
         </table>
     </div>
 </div>

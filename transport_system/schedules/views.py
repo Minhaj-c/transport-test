@@ -455,12 +455,16 @@ def update_current_stop(request):
 
 def compute_future_load_for_schedule(schedule):
     """
-    Core prediction function.
+    Core prediction function with support for spare buses starting mid-route.
 
     Uses:
       - schedule.current_passengers
-      - schedule.current_stop_sequence
+      - schedule.current_stop_sequence (for both regular buses and spare buses)
       - Pre-informs for this (route, date) with BOTH boarding & dropoff stops
+
+    For spare buses (is_spare_trip=True):
+      - Starts from current_stop_sequence (the overflow point)
+      - Only considers boarding/alighting from that point onwards
 
     For each pre-inform:
       - passengers ride from boarding_seq up to (but NOT including) dropoff_seq.
@@ -476,7 +480,13 @@ def compute_future_load_for_schedule(schedule):
         capacity = 0
 
     route = schedule.route
-    stops_qs = route.stops.all().order_by("sequence")
+    
+    # 🔥 For spare buses, only show stops from their starting point onwards
+    if getattr(schedule, 'is_spare_trip', False) and current_seq > 0:
+        stops_qs = route.stops.filter(sequence__gte=current_seq).order_by("sequence")
+    else:
+        # Regular bus: show all stops after current position
+        stops_qs = route.stops.filter(sequence__gt=current_seq).order_by("sequence")
 
     # ---- Get all relevant pre-informs ----
     try:
@@ -513,16 +523,19 @@ def compute_future_load_for_schedule(schedule):
         board_map = {}
         drop_map = {}
 
-    running_load = current_passengers
+    # 🔥 For spare buses starting mid-route, begin with 0 passengers
+    if getattr(schedule, 'is_spare_trip', False):
+        running_load = 0  # Spare bus starts empty
+        current_passengers = 0  # Override display value
+    else:
+        running_load = current_passengers
+        
     stops_output = []
     will_overflow = False
     overflow_from_stop_seq = None
 
     for stop in stops_qs:
         seq = stop.sequence
-
-        if seq <= current_seq:
-            continue
 
         incoming = board_map.get(seq, 0)
         leaving = drop_map.get(seq, 0)
@@ -555,6 +568,7 @@ def compute_future_load_for_schedule(schedule):
         "capacity": capacity,
         "current_stop_sequence": current_seq,
         "current_passengers": current_passengers,
+        "is_spare_trip": getattr(schedule, 'is_spare_trip', False),  # 🔥 NEW
         "future_stops": stops_output,
         "will_overflow": will_overflow,
         "overflow_from_stop_sequence": overflow_from_stop_seq,

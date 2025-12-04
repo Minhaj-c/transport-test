@@ -198,9 +198,7 @@ def route_live_status_view(request, route_id):
             )
 
         # Try to find stop object (optional)
-        target_stop = (
-            route.stops.filter(sequence=target_seq).first()
-        )
+        target_stop = route.stops.filter(sequence=target_seq).first()
 
     # 4) Get all schedules for this route + date
     schedules_qs = (
@@ -242,14 +240,29 @@ def route_live_status_view(request, route_id):
         capacity = forecast.get("capacity") or 0
         current_passengers = forecast.get("current_passengers") or 0
         current_seq = forecast.get("current_stop_sequence") or 0
+        start_seq = forecast.get("start_stop_sequence") or 1
+        end_seq = forecast.get("end_stop_sequence")  # can be None
+
+        # 🔥 Skip schedules that do NOT cover this stop
+        if target_seq is not None:
+            if target_seq < start_seq:
+                continue
+            if end_seq is not None and target_seq > end_seq:
+                continue
+
+        # Bus cannot be logically before its start segment
+        effective_current_seq = current_seq
+        if effective_current_seq < start_seq:
+            effective_current_seq = start_seq - 1
 
         # Find predicted passengers at the target stop
         predicted_at_stop = None
 
-        # if bus already passed or at this stop, treat current_passengers as load
-        if target_seq <= current_seq:
+        # if bus already passed or at this stop (relative to effective_current_seq),
+        # treat current_passengers as load at that stop
+        if target_seq <= effective_current_seq:
             predicted_at_stop = current_passengers
-            stops_away = max(current_seq - target_seq, 0) * -1  # negative means already passed
+            stops_away = max(effective_current_seq - target_seq, 0) * -1  # negative means already passed
         else:
             # look into future_stops
             future_stops = forecast.get("future_stops", [])
@@ -259,10 +272,10 @@ def route_live_status_view(request, route_id):
                     break
 
             if predicted_at_stop is None:
-                # This bus never reaches that stop (e.g. short-turned)
+                # This bus never reaches that stop within its segment
                 continue
 
-            stops_away = target_seq - current_seq
+            stops_away = target_seq - effective_current_seq
 
         # Fallback if capacity missing
         if capacity <= 0:
@@ -288,6 +301,8 @@ def route_live_status_view(request, route_id):
             "is_spare_trip": bool(getattr(schedule, "is_spare_trip", False)),
             "capacity": capacity,
             "current_stop_sequence": current_seq,
+            "start_stop_sequence": start_seq,
+            "end_stop_sequence": end_seq,
             "stops_away": stops_away,          # 0 = at stop, negative = already passed
             "eta_minutes": eta_minutes,        # 0 if at / past stop
             "predicted_passengers_at_stop": occupied,
