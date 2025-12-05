@@ -2,515 +2,827 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Demand Alerts – Zonal Admin</title>
+    <title>Demand Alerts - Zonal Admin</title>
     <style>
         :root {
-            --bg-page: #f3f4f6;
-            --bg-header: #ffffff;
-            --bg-card: #ffffff;
-            --border-soft: #e5e7eb;
-            --text-main: #111827;
-            --text-muted: #6b7280;
-            --accent: #2563eb;
-            --accent-soft: #eff6ff;
+            --white: #ffffff;
+            --black: #000000;
+            --gray-50: #fafafa;
+            --gray-100: #f5f5f5;
+            --gray-200: #e5e5e5;
+            --gray-300: #d4d4d4;
+            --gray-400: #a3a3a3;
+            --gray-500: #737373;
+            --gray-600: #525252;
+            --gray-700: #404040;
+            --gray-800: #262626;
+            --gray-900: #171717;
+            
+            --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'SF Mono', Monaco, 'Courier New', monospace;
         }
-
-        * { box-sizing: border-box; }
-
-        body {
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        
+        * {
             margin: 0;
-            background: var(--bg-page);
-            color: var(--text-main);
+            padding: 0;
+            box-sizing: border-box;
         }
-
+        
+        body {
+            font-family: var(--font-sans);
+            background: var(--gray-50);
+            color: var(--gray-900);
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+        
+        /* Header */
         .header {
-            background: var(--bg-header);
-            border-bottom: 1px solid var(--border-soft);
-            padding: 14px 28px;
+            background: var(--white);
+            border-bottom: 1px solid var(--gray-200);
+            padding: 1.25rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-
-        .header-left h2 {
-            margin: 0;
-            font-size: 18px;
-            font-weight: 600;
+        
+        .header-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+            color: var(--black);
         }
-
-        .header-left small {
-            display: block;
-            margin-top: 4px;
-            font-size: 12px;
-            color: var(--text-muted);
+        
+        .header-subtitle {
+            font-size: 0.875rem;
+            color: var(--gray-500);
+            margin-top: 0.25rem;
         }
-
-        .header-nav a {
-            color: #374151;
+        
+        .zone-badge {
+            display: inline-block;
+            background: var(--gray-100);
+            color: var(--gray-700);
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin-left: 0.5rem;
+            border: 1px solid var(--gray-200);
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .nav-link {
             text-decoration: none;
-            margin-left: 12px;
-            font-size: 13px;
-            padding: 6px 10px;
-            border-radius: 999px;
-            border: 1px solid transparent;
+            color: var(--gray-600);
+            font-size: 0.875rem;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            transition: all 0.15s ease;
         }
-
-        .header-nav a:hover {
-            border-color: var(--border-soft);
-            background: #f9fafb;
+        
+        .nav-link:hover {
+            background: var(--gray-100);
+            color: var(--gray-900);
         }
-
-        .page {
-            width: 96%;
-            max-width: 1100px;
-            margin: 20px auto 32px;
+        
+        .nav-link.active {
+            background: var(--gray-900);
+            color: var(--white);
         }
-
-        .section-title {
-            margin: 0 0 4px;
-            font-size: 16px;
+        
+        /* Main Container */
+        .container {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+        
+        /* Date Filter */
+        .date-filter {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .filter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        
+        .filter-title {
+            font-size: 1.25rem;
             font-weight: 600;
+            color: var(--black);
         }
-
-        .section-subtitle {
-            margin: 0 0 10px;
-            font-size: 12px;
-            color: var(--text-muted);
+        
+        .filter-subtitle {
+            font-size: 0.875rem;
+            color: var(--gray-500);
+            margin-top: 0.25rem;
+            max-width: 800px;
         }
-
+        
+        .filter-form {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .date-input {
+            padding: 0.625rem 1rem;
+            border: 1px solid var(--gray-300);
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            background: var(--white);
+            color: var(--gray-900);
+            font-family: var(--font-sans);
+            min-width: 200px;
+        }
+        
+        .date-input:focus {
+            outline: none;
+            border-color: var(--gray-400);
+        }
+        
+        .apply-btn {
+            background: var(--black);
+            color: var(--white);
+            border: none;
+            padding: 0.625rem 1.5rem;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+        
+        .apply-btn:hover {
+            background: var(--gray-800);
+        }
+        
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+        }
+        
+        .stat-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        
+        .stat-icon {
+            width: 2.5rem;
+            height: 2.5rem;
+            background: var(--gray-100);
+            border-radius: 0.375rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            color: var(--gray-700);
+            border: 1px solid var(--gray-200);
+        }
+        
+        .stat-title {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--gray-600);
+        }
+        
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--black);
+            line-height: 1;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-desc {
+            font-size: 0.75rem;
+            color: var(--gray-500);
+            border-left: 2px solid var(--gray-300);
+            padding-left: 0.75rem;
+        }
+        
+        /* Alert Level Legend */
         .legend {
-            font-size: 11px;
-            color: var(--text-muted);
-            margin-bottom: 10px;
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
         }
-
-        .legend span {
-            margin-right: 8px;
+        
+        .legend-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--gray-700);
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
-
-        .card {
-            background: var(--bg-card);
-            border-radius: 8px;
-            border: 1px solid var(--border-soft);
-            padding: 10px 10px;
-            box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+        
+        .legend-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .level-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            border: 1px solid;
+        }
+        
+        .level-normal {
+            background: var(--gray-100);
+            color: var(--gray-700);
+            border-color: var(--gray-300);
+        }
+        
+        .level-medium {
+            background: var(--gray-200);
+            color: var(--gray-800);
+            border-color: var(--gray-400);
+        }
+        
+        .level-high {
+            background: var(--gray-300);
+            color: var(--gray-900);
+            border-color: var(--gray-500);
+        }
+        
+        .level-critical {
+            background: var(--gray-900);
+            color: var(--white);
+            border-color: var(--black);
+        }
+        
+        /* Alert Sections */
+        .alert-section {
+            background: var(--white);
+            border: 1px solid var(--gray-200);
+            border-radius: 0.5rem;
+            overflow: hidden;
+            margin-bottom: 2rem;
+        }
+        
+        .section-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--gray-200);
+            background: var(--gray-50);
+        }
+        
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--black);
+            margin-bottom: 0.5rem;
+        }
+        
+        .section-subtitle {
+            font-size: 0.875rem;
+            color: var(--gray-600);
+        }
+        
+        .table-container {
             overflow-x: auto;
-            margin-bottom: 20px;
         }
-
-        table {
+        
+        .alert-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 12px;
+            min-width: 1000px;
         }
-
-        th, td {
-            padding: 7px 6px;
+        
+        .alert-table thead {
+            background: var(--gray-50);
+            border-bottom: 1px solid var(--gray-200);
+        }
+        
+        .alert-table th {
+            padding: 1rem 1.25rem;
             text-align: left;
-            border-bottom: 1px solid #e5e7eb;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--gray-600);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
             white-space: nowrap;
         }
-
-        th {
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: .03em;
-            color: #6b7280;
-            background: #f9fafb;
+        
+        .alert-table tbody tr {
+            border-bottom: 1px solid var(--gray-200);
+            transition: background 0.15s ease;
         }
-
-        tr:nth-child(even) td {
-            background: #f9fafb;
+        
+        .alert-table tbody tr:hover {
+            background: var(--gray-50);
         }
-
-        .badge {
-            display: inline-block;
-            font-size: 11px;
-            padding: 2px 8px;
-            border-radius: 999px;
+        
+        .alert-table td {
+            padding: 1rem 1.25rem;
+            font-size: 0.875rem;
+            color: var(--gray-900);
+            vertical-align: top;
+        }
+        
+        /* Status Badges */
+        .status-badge {
+            padding: 0.375rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
             font-weight: 500;
-        }
-
-        .badge-level-normal {
-            background: #e5e7eb;
-            color: #374151;
-        }
-        .badge-level-medium {
-            background: #fef9c3;
-            color: #854d0e;
-        }
-        .badge-level-high {
-            background: #fee2e2;
-            color: #b91c1c;
-        }
-        .badge-level-critical {
-            background: #991b1b;
-            color: #fee2e2;
-        }
-
-        .badge-status-reported {
-            background: #e0f2fe;
-            color: #075985;
-        }
-        .badge-status-verified {
-            background: #dcfce7;
-            color: #166534;
-        }
-        .badge-status-dispatched {
-            background: #fef3c7;
-            color: #92400e;
-        }
-        .badge-status-resolved {
-            background: #e5e7eb;
-            color: #4b5563;
-        }
-        .badge-status-expired {
-            background: #f3f4f6;
-            color: #6b7280;
-        }
-
-        .muted {
-            color: var(--text-muted);
-            font-size: 11px;
-        }
-        .muted-small {
-            color: var(--text-muted);
-            font-size: 11px;
-        }
-
-        .pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 10px;
-            border-radius: 999px;
-            background: var(--accent-soft);
-            font-size: 11px;
-            color: #1d4ed8;
-        }
-
-        .pill-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 999px;
-            background: #1d4ed8;
-        }
-
-        .top-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-
-        .date-form {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 12px;
-        }
-
-        .date-form input[type="date"] {
-            font-size: 12px;
-            padding: 4px 6px;
-            border-radius: 6px;
-            border: 1px solid var(--border-soft);
-        }
-
-        .date-form button {
-            border: none;
-            border-radius: 999px;
-            padding: 5px 12px;
-            font-size: 12px;
-            background: var(--accent);
-            color: white;
-            cursor: pointer;
-        }
-
-        .date-form button:hover {
-            background: #1d4ed8;
-        }
-
-        .chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            font-size: 11px;
-            padding: 3px 8px;
-            border-radius: 999px;
-            background: #e5e7eb;
-            color: #374151;
-        }
-
-        .chip-count {
-            font-weight: 600;
-        }
-
-        .nowrap { white-space: nowrap; }
-
-        .btn-small {
+            border: 1px solid;
             display: inline-block;
-            padding: 4px 10px;
-            font-size: 11px;
-            border-radius: 999px;
-            border: 1px solid #2563eb;
-            background: #2563eb;
-            color: #ffffff;
+        }
+        
+        .status-reported {
+            background: var(--gray-100);
+            color: var(--gray-700);
+            border-color: var(--gray-300);
+        }
+        
+        .status-verified {
+            background: var(--gray-200);
+            color: var(--gray-800);
+            border-color: var(--gray-400);
+        }
+        
+        .status-dispatched {
+            background: var(--gray-300);
+            color: var(--gray-900);
+            border-color: var(--gray-500);
+        }
+        
+        .status-resolved {
+            background: var(--gray-100);
+            color: var(--gray-600);
+            border-color: var(--gray-300);
+        }
+        
+        .status-expired {
+            background: var(--gray-50);
+            color: var(--gray-500);
+            border-color: var(--gray-200);
+        }
+        
+        /* Action Buttons */
+        .action-btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            font-weight: 500;
             text-decoration: none;
+            display: inline-block;
+            border: 1px solid;
             cursor: pointer;
+            transition: all 0.15s ease;
         }
-        .btn-small:hover {
-            background: #1d4ed8;
+        
+        .btn-dispatch {
+            background: var(--black);
+            color: var(--white);
+            border-color: var(--black);
         }
-
-        /* 🔥 NEW: Dispatched status badge */
-        .badge-dispatched {
-            background: #dcfce7;
-            color: #166534;
-            padding: 4px 10px;
-            font-size: 11px;
-            border-radius: 999px;
-            font-weight: 500;
+        
+        .btn-dispatch:hover {
+            background: var(--gray-800);
+            border-color: var(--gray-800);
+        }
+        
+        .btn-dispatched {
+            background: var(--gray-300);
+            color: var(--gray-900);
+            border-color: var(--gray-400);
+            cursor: default;
+        }
+        
+        .btn-monitor {
+            background: var(--gray-100);
+            color: var(--gray-600);
+            border-color: var(--gray-300);
+            cursor: default;
+        }
+        
+        /* Text Helpers */
+        .text-muted {
+            color: var(--gray-500);
+            font-size: 0.75rem;
+        }
+        
+        .text-strong {
+            font-weight: 600;
+            color: var(--gray-900);
+        }
+        
+        .nowrap {
+            white-space: nowrap;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            padding: 3rem 1.5rem;
+            text-align: center;
+            color: var(--gray-500);
+        }
+        
+        .empty-icon {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+        
+        .empty-text {
+            font-size: 0.875rem;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 1rem;
+            }
+            
+            .header {
+                padding: 1rem;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+            
+            .nav-links {
+                width: 100%;
+                justify-content: space-between;
+            }
+            
+            .filter-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+            
+            .filter-form {
+                width: 100%;
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .date-input {
+                width: 100%;
+            }
+            
+            .apply-btn {
+                width: 100%;
+            }
         }
     </style>
 </head>
 <body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div>
+                <h1 class="header-title">Demand Alerts</h1>
+                <div class="header-subtitle">
+                    Auto-generated from <span class="text-strong">NOTED</span> pre-informs and live bus load predictions
+                    {% if user.zone %}
+                        <span class="zone-badge">{{ user.zone.name }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            <nav class="nav-links">
+                <a href="/zonal-admin/" class="nav-link">Dashboard</a>
+                <a href="/zonal-admin/preinforms/" class="nav-link">Pre-Informs</a>
+                <a href="/zonal-admin/schedules/" class="nav-link">Schedules</a>
+            </nav>
+        </div>
+    </header>
 
-<div class="header">
-    <div class="header-left">
-        <h2>
-            Demand Alerts
-            {% if user.zone %}
-                – {{ user.zone.name }}
-            {% endif %}
-        </h2>
-        <small>
-            Auto-generated from <strong>NOTED</strong> pre-informs and live bus load predictions.
-        </small>
-    </div>
-    <div class="header-nav">
-        <a href="/zonal-admin/">Dashboard</a>
-        <a href="/zonal-admin/preinforms/">Pre-Informs</a>
-        <a href="/zonal-admin/schedules/">Schedules</a>
-    </div>
-</div>
+    <!-- Main Content -->
+    <main class="container">
+        <!-- Date Filter -->
+        <div class="date-filter">
+            <div class="filter-header">
+                <div>
+                    <h2 class="filter-title">Live Demand Alerts</h2>
+                    <p class="filter-subtitle">
+                        Showing alerts for <span class="text-strong">{{ selected_date|date:"Y-m-d" }}</span>. 
+                        Top section shows <span class="text-strong">people waiting at stops</span>. 
+                        Bottom section shows <span class="text-strong">people inside buses after each stop</span>.
+                        For <span class="text-strong">High / Critical</span> predictions, you can dispatch a spare bus.
+                    </p>
+                </div>
+            </div>
+            <form method="get" class="filter-form">
+                <label for="date" style="font-size: 0.875rem; font-weight: 500; color: var(--gray-700);">Date:</label>
+                <input 
+                    type="date"
+                    id="date"
+                    name="date"
+                    value="{{ selected_date|date:'Y-m-d' }}"
+                    class="date-input"
+                >
+                <button type="submit" class="apply-btn">Apply</button>
+            </form>
+        </div>
 
-<div class="page">
-    <div class="top-row">
-        <div>
-            <h3 class="section-title">Live Demand Alerts</h3>
-            <p class="section-subtitle">
-                Showing alerts for
-                <strong>{{ selected_date|date:"Y-m-d" }}</strong>.  
-                Top section = <strong>people waiting at stops</strong>.  
-                Bottom section = <strong>people inside buses after each stop</strong>.
-                <br>
-                <span class="muted">
-                    For <strong>High / Critical</strong> predictions, you can dispatch a spare bus.
-                </span>
-            </p>
-
-            <div style="margin-top:4px;">
-                <span class="chip">
-                    <span class="chip-count">{{ preinform_alerts|length }}</span> pre-inform alerts
-                </span>
-                <span class="chip" style="margin-left:4px;">
-                    <span class="chip-count">{{ prediction_alerts|length }}</span> prediction alerts
-                </span>
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon">P</div>
+                    <div>
+                        <div class="stat-title">Pre-Inform Alerts</div>
+                    </div>
+                </div>
+                <div class="stat-value">{{ preinform_alerts|length }}</div>
+                <div class="stat-desc">
+                    People waiting at stops from NOTED pre-informs
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon">B</div>
+                    <div>
+                        <div class="stat-title">Prediction Alerts</div>
+                    </div>
+                </div>
+                <div class="stat-value">{{ prediction_alerts|length }}</div>
+                <div class="stat-desc">
+                    Bus overflow predictions from live data
+                </div>
             </div>
         </div>
 
-        <form method="get" class="date-form">
-            <label for="date">Date:</label>
-            <input
-                id="date"
-                type="date"
-                name="date"
-                value="{{ selected_date|date:'Y-m-d' }}"
-            >
-            <button type="submit">Apply</button>
-        </form>
-    </div>
-
-    <div class="legend">
-        <span><span class="badge badge-level-normal">Normal</span> 0–9 people</span>
-        <span><span class="badge badge-level-medium">Medium</span> 10–24 people</span>
-        <span><span class="badge badge-level-high">High</span> 25–49 people</span>
-        <span><span class="badge badge-level-critical">Critical</span> 50+ people</span>
-    </div>
-
-    <!-- PRE-INFORM DEMAND -->
-    <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-            <div class="pill">
-                <span class="pill-dot"></span>
-                Stop demand from NOTED pre-informs
+        <!-- Alert Level Legend -->
+        <div class="legend">
+            <div class="legend-title">Alert Level Guide</div>
+            <div class="legend-items">
+                <div class="legend-item">
+                    <span class="level-badge level-normal">Normal</span>
+                    <span class="text-muted">0–9 people</span>
+                </div>
+                <div class="legend-item">
+                    <span class="level-badge level-medium">Medium</span>
+                    <span class="text-muted">10–24 people</span>
+                </div>
+                <div class="legend-item">
+                    <span class="level-badge level-high">High</span>
+                    <span class="text-muted">25–49 people</span>
+                </div>
+                <div class="legend-item">
+                    <span class="level-badge level-critical">Critical</span>
+                    <span class="text-muted">50+ people</span>
+                </div>
             </div>
-            <span class="muted">
-                People = passengers who plan to <strong>board at that stop</strong>.
-            </span>
         </div>
 
-        <table>
-            <thead>
-            <tr>
-                <th>#</th>
-                <th>Stop</th>
-                <th>Route</th>
-                <th>People</th>
-                <th>Level</th>
-                <th>Status</th>
-                <th>Created</th>
-            </tr>
-            </thead>
-            <tbody>
-            {% if preinform_alerts %}
-                {% for alert in preinform_alerts %}
-                    {% with level=alert.get_level %}
-                    <tr>
-                        <td>{{ forloop.counter }}</td>
-                        <td>
-                            {{ alert.stop.name }}
-                            <div class="muted-small">Stop #{{ alert.stop.sequence }}</div>
-                        </td>
-                        <td>
-                            {% if alert.stop.route %}
-                                {{ alert.stop.route.number }} – {{ alert.stop.route.name }}
-                            {% else %}
-                                <span class="muted">No route</span>
-                            {% endif %}
-                        </td>
-                        <td>{{ alert.number_of_people }}</td>
-                        <td>
-                            <span class="badge badge-level-{{ level }}">
-                                {{ level|title }}
-                            </span>
-                        </td>
-                        <td>
-                            <span class="badge badge-status-{{ alert.status }}">
-                                {{ alert.get_status_display }}
-                            </span>
-                        </td>
-                        <td class="nowrap">{{ alert.created_at|date:"Y-m-d H:i" }}</td>
-                    </tr>
-                    {% endwith %}
-                {% endfor %}
-            {% else %}
-                <tr>
-                    <td colspan="7" class="muted">
-                        No pre-inform alerts for this date.
-                    </td>
-                </tr>
-            {% endif %}
-            </tbody>
-        </table>
-    </div>
-
-    <!-- BUS OVERLOAD PREDICTIONS -->
-    <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-            <div class="pill" style="background:#fef3c7; color:#92400e;">
-                <span class="pill-dot" style="background:#f97316;"></span>
-                Bus overflow predictions
+        <!-- Pre-Inform Alerts Section -->
+        <section class="alert-section">
+            <div class="section-header">
+                <div>
+                    <div class="section-title">
+                        <span>Stop Demand from NOTED Pre-Informs</span>
+                    </div>
+                    <div class="section-subtitle">
+                        People = passengers who plan to <span class="text-strong">board at that stop</span>
+                    </div>
+                </div>
             </div>
-            <span class="muted">
-                Expected load = passengers <strong>inside bus after this stop</strong>.
-            </span>
-        </div>
+            <div class="table-container">
+                {% if preinform_alerts %}
+                    <table class="alert-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Stop Details</th>
+                                <th>Route</th>
+                                <th>People</th>
+                                <th>Level</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for alert in preinform_alerts %}
+                                {% with level=alert.get_level %}
+                                <tr>
+                                    <td class="nowrap">{{ forloop.counter }}</td>
+                                    <td>
+                                        <div class="text-strong">{{ alert.stop.name }}</div>
+                                        <div class="text-muted">Stop #{{ alert.stop.sequence }}</div>
+                                    </td>
+                                    <td>
+                                        {% if alert.stop.route %}
+                                            <div class="text-strong">{{ alert.stop.route.number }}</div>
+                                            <div class="text-muted">{{ alert.stop.route.name }}</div>
+                                        {% else %}
+                                            <span class="text-muted">No route assigned</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="text-strong">{{ alert.number_of_people }}</div>
+                                        <div class="text-muted">passengers</div>
+                                    </td>
+                                    <td>
+                                        <span class="level-badge level-{{ level }}">
+                                            {{ level|title }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="status-badge status-{{ alert.status }}">
+                                            {{ alert.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td class="nowrap">
+                                        <div>{{ alert.created_at|date:"H:i" }}</div>
+                                        <div class="text-muted">{{ alert.created_at|date:"Y-m-d" }}</div>
+                                    </td>
+                                </tr>
+                                {% endwith %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="empty-state">
+                        <div class="empty-icon">—</div>
+                        <div class="empty-text">No pre-inform alerts for this date.</div>
+                    </div>
+                {% endif %}
+            </div>
+        </section>
 
-        <table>
-            <thead>
-            <tr>
-                <th>#</th>
-                <th>Alert Stop</th>
-                <th>Route</th>
-                <th>Bus / Now</th>
-                <th>Expected Load</th>
-                <th>Level</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th>Action</th>
-            </tr>
-            </thead>
-            <tbody>
-            {% if prediction_alerts %}
-                {% for alert in prediction_alerts_with_schedule %}
-                    {% with level=alert.level %}
-                    {% with schedule=alert.bus_schedule %}
-                    <tr>
-                        <td>{{ forloop.counter }}</td>
+        <!-- Bus Overflow Predictions Section -->
+        <section class="alert-section">
+            <div class="section-header">
+                <div>
+                    <div class="section-title">
+                        <span>Bus Overflow Predictions</span>
+                    </div>
+                    <div class="section-subtitle">
+                        Expected load = passengers <span class="text-strong">inside bus after this stop</span>
+                    </div>
+                </div>
+            </div>
+            <div class="table-container">
+                {% if prediction_alerts %}
+                    <table class="alert-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Alert Stop</th>
+                                <th>Route</th>
+                                <th>Bus Details</th>
+                                <th>Expected Load</th>
+                                <th>Level</th>
+                                <th>Status</th>
+                                <th>Created</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for alert in prediction_alerts_with_schedule %}
+                                {% with level=alert.level %}
+                                {% with schedule=alert.bus_schedule %}
+                                <tr>
+                                    <td class="nowrap">{{ forloop.counter }}</td>
+                                    <td>
+                                        <div class="text-strong">{{ alert.alert.stop.name }}</div>
+                                        <div class="text-muted">Stop #{{ alert.alert.stop.sequence }}</div>
+                                    </td>
+                                    <td>
+                                        <div class="text-strong">{{ alert.alert.stop.route.number }}</div>
+                                        <div class="text-muted">{{ alert.alert.stop.route.name }}</div>
+                                    </td>
+                                    <td>
+                                        {% if schedule %}
+                                            <div class="text-strong">{{ schedule.bus.number_plate }}</div>
+                                            <div class="text-muted">
+                                                Stop #{{ schedule.current_stop_sequence|default:"—" }}
+                                                · Load: {{ schedule.current_passengers|default:0 }}/{{ schedule.bus.capacity }}
+                                            </div>
+                                        {% else %}
+                                            <span class="text-muted">No running bus found</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="text-strong">{{ alert.alert.number_of_people }}</div>
+                                        {% if schedule %}
+                                            <div class="text-muted">of {{ schedule.bus.capacity }} capacity</div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="level-badge level-{{ level }}">
+                                            {{ level|title }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="status-badge status-{{ alert.alert.status }}">
+                                            {{ alert.alert.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td class="nowrap">
+                                        <div>{{ alert.alert.created_at|date:"H:i" }}</div>
+                                        <div class="text-muted">{{ alert.alert.created_at|date:"Y-m-d" }}</div>
+                                    </td>
+                                    <td>
+                                        <!-- 🔥 CHECK IF SPARE BUS ALREADY DISPATCHED FOR THIS ROUTE -->
+                                        {% if alert.alert.status == 'dispatched' %}
+                                            <span class="action-btn btn-dispatched">
+                                                Bus Dispatched
+                                            </span>
+                                        {% elif level == 'high' or level == 'critical' %}
+                                            <a href="{% url 'zonal-dispatch-spare' alert.alert.id %}" class="action-btn btn-dispatch">
+                                                Dispatch
+                                            </a>
+                                        {% else %}
+                                            <span class="action-btn btn-monitor">
+                                                Monitor
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endwith %}
+                                {% endwith %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="empty-state">
+                        <div class="empty-icon">—</div>
+                        <div class="empty-text">No overflow predictions for this date.</div>
+                    </div>
+                {% endif %}
+            </div>
+        </section>
+    </main>
 
-                        <td>
-                            {{ alert.alert.stop.name }}
-                            <div class="muted-small">Stop #{{ alert.alert.stop.sequence }}</div>
-                        </td>
-
-                        <td>
-                            {{ alert.alert.stop.route.number }} – {{ alert.alert.stop.route.name }}
-                        </td>
-
-                        <td>
-                            {% if schedule %}
-                                <div class="nowrap">Bus: {{ schedule.bus.number_plate }}</div>
-                                <div class="muted-small">
-                                    Stop #{{ schedule.current_stop_sequence|default:"—" }}
-                                    · Load: {{ schedule.current_passengers|default:0 }}/{{ schedule.bus.capacity }}
-                                </div>
-                            {% else %}
-                                <span class="muted-small">No running bus found</span>
-                            {% endif %}
-                        </td>
-
-                        <td>
-                            {{ alert.alert.number_of_people }}
-                            {% if schedule %}
-                                / {{ schedule.bus.capacity }}
-                            {% endif %}
-                        </td>
-
-                        <td>
-                            <span class="badge badge-level-{{ level }}">
-                                {{ level|title }}
-                            </span>
-                        </td>
-
-                        <td>
-                            <span class="badge badge-status-{{ alert.alert.status }}">
-                                {{ alert.alert.get_status_display }}
-                            </span>
-                        </td>
-
-                        <td class="nowrap">{{ alert.alert.created_at|date:"Y-m-d H:i" }}</td>
-
-                        <td>
-                            {# 🔥 CHECK IF SPARE BUS ALREADY DISPATCHED FOR THIS ROUTE #}
-                            {% if alert.alert.status == 'dispatched' %}
-                                <span class="badge-dispatched">
-                                    ✓ Bus Dispatched
-                                </span>
-                            {% elif level == 'high' or level == 'critical' %}
-                                <a href="{% url 'zonal-dispatch-spare' alert.alert.id %}" class="btn-small">
-                                    Dispatch
-                                </a>
-                            {% else %}
-                                <span class="muted-small">Monitor</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endwith %}
-                    {% endwith %}
-                {% endfor %}
-            {% else %}
-                <tr>
-                    <td colspan="9" class="muted">
-                        No overflow predictions for this date.
-                    </td>
-                </tr>
-            {% endif %}
-            </tbody>
-        </table>
-    </div>
-</div>
+    <script>
+        // Simple script to enhance the date input
+        document.addEventListener('DOMContentLoaded', function() {
+            const dateInput = document.getElementById('date');
+            
+            // Set today as default if empty
+            if (dateInput && !dateInput.value) {
+                const today = new Date().toISOString().split('T')[0];
+                dateInput.value = today;
+            }
+            
+            // Add subtle hover effect to table rows
+            const tableRows = document.querySelectorAll('.alert-table tbody tr');
+            tableRows.forEach(row => {
+                row.addEventListener('mouseenter', function() {
+                    this.style.backgroundColor = 'var(--gray-50)';
+                });
+                row.addEventListener('mouseleave', function() {
+                    this.style.backgroundColor = '';
+                });
+            });
+        });
+    </script>
 </body>
 </html>

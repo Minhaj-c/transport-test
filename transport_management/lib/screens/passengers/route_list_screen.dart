@@ -25,7 +25,8 @@ class _RouteListScreenState extends State<RouteListScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<AppProvider>(context, listen: false).loadRoutes();
+      // 🔥 Load routes with today's schedules only
+      Provider.of<AppProvider>(context, listen: false).loadRoutesWithSchedules();
     });
   }
 
@@ -254,6 +255,32 @@ class _RouteListScreenState extends State<RouteListScreen> {
                   ),
                 ),
               ],
+              
+              // 🔥 NEW: Today's routes indicator
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.blue[200]!),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.calendar_today, size: 14, color: Colors.blue[700]),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Showing routes with schedules today',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.blue[700],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -264,7 +291,7 @@ class _RouteListScreenState extends State<RouteListScreen> {
               ? const LoadingWidget(message: 'Loading routes...')
               : appProvider.routes.isEmpty
                   ? const EmptyWidget(
-                      message: 'No routes available',
+                      message: 'No routes running today',
                       icon: Icons.route,
                     )
                   : _buildRouteList(appProvider.routes),
@@ -274,7 +301,7 @@ class _RouteListScreenState extends State<RouteListScreen> {
   }
 
   Widget _buildRouteList(List<BusRoute> routes) {
-    // "Where is my bus?" – don’t show everything until user searches
+    // "Where is my bus?" – don't show everything until user searches
     if (_searchQuery.isEmpty && !_filterApplied) {
       return Center(
         child: Padding(
@@ -294,6 +321,16 @@ class _RouteListScreenState extends State<RouteListScreen> {
                 'route number / stop name in the search box.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Only showing routes with buses running today',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.blue[700],
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
@@ -319,9 +356,9 @@ class _RouteListScreenState extends State<RouteListScreen> {
               const SizedBox(height: 8),
               Text(
                 _filterApplied
-                    ? 'No route runs from this start stop to this end stop.\n'
+                    ? 'No route runs from this start stop to this end stop today.\n'
                       'Try different stops or clear filters.'
-                    : 'No route or stop matches this search.\n'
+                    : 'No route or stop matches this search today.\n'
                       'Try a different bus number or stop name.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey[600]),
@@ -340,7 +377,7 @@ class _RouteListScreenState extends State<RouteListScreen> {
 
     return RefreshIndicator(
       onRefresh: () =>
-          Provider.of<AppProvider>(context, listen: false).loadRoutes(),
+          Provider.of<AppProvider>(context, listen: false).loadRoutesWithSchedules(),
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: filteredRoutes.length,

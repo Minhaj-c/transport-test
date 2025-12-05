@@ -29,6 +29,44 @@ class AppProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  // 🔥 NEW: Load only routes that have schedules today
+  Future<void> loadRoutesWithSchedules() async {
+    _isLoadingRoutes = true;
+    notifyListeners();
+
+    try {
+      // Get today's date in YYYY-MM-DD format
+      final today = DateTime.now();
+      final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+      
+      // Load all routes
+      final allRoutes = await ApiService.getRoutes();
+      
+      // Load today's schedules
+      final todaySchedules = await ApiService.getSchedules(date: todayStr);
+      
+      // Get unique route IDs that have schedules today
+      final Set<int> routeIdsWithSchedules = {};
+      for (var schedule in todaySchedules) {
+        if (schedule.route.id != null) {
+          routeIdsWithSchedules.add(schedule.route.id!);
+        }
+      }
+      
+      // Filter routes to only those with schedules today
+      _routes = allRoutes
+          .where((route) => routeIdsWithSchedules.contains(route.id))
+          .toList();
+          
+    } catch (e) {
+      print('Error loading routes with schedules: $e');
+      _routes = [];
+    }
+
+    _isLoadingRoutes = false;
+    notifyListeners();
+  }
+
   // Load schedules
   Future<void> loadSchedules({int? routeId, String? date}) async {
     _isLoadingSchedules = true;
