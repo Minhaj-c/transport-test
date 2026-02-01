@@ -3,7 +3,7 @@ class ApiConfig {
   // Find your IP: 
   // - Windows: ipconfig (look for IPv4)
   // - Mac/Linux: ifconfig (look for inet)
-  static const String baseUrl = 'http://172.17.29.81:8000';
+  static const String baseUrl = 'http://10.188.183.81:8000';
   
   // API Endpoints
   static const String signup = '$baseUrl/api/signup/';

@@ -417,12 +417,14 @@ class _ActiveScheduleCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.green[400]!, Colors.green[600]!],
+          colors: schedule.isSpareTrip
+              ? [Colors.orange[400]!, Colors.orange[700]!]
+              : [Colors.green[400]!, Colors.green[600]!],
         ),
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.green.withOpacity(0.3),
+            color: (schedule.isSpareTrip ? Colors.orange : Colors.green).withOpacity(0.3),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -430,6 +432,25 @@ class _ActiveScheduleCard extends StatelessWidget {
       ),
       child: Column(
         children: [
+          if (schedule.isSpareTrip)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.orange[800],
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Text(
+                '⚡ SPARE BUS DUTY',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ),
           Row(
             children: [
               Container(
@@ -438,9 +459,9 @@ class _ActiveScheduleCard extends StatelessWidget {
                   color: Colors.white,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.directions_bus,
-                  color: Colors.green,
+                  color: schedule.isSpareTrip ? Colors.orange[800] : Colors.green,
                   size: 24,
                 ),
               ),
@@ -608,6 +629,32 @@ class _ScheduleCard extends StatelessWidget {
                   ),
               ],
             ),
+            if (schedule.isSpareTrip)
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.orange),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.warning_amber_rounded,
+                        size: 16, color: Colors.orange[800]),
+                    const SizedBox(width: 6),
+                    Text(
+                      'SPARE BUS TASK',
+                      style: TextStyle(
+                        color: Colors.orange[900],
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             const Divider(),
 
             // Route info

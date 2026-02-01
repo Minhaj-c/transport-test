@@ -27,6 +27,7 @@ class Schedule {
   final String? currentStopName;
   final int? nextStopSequence;
   final String? nextStopName;
+  final bool isSpareTrip;
 
   Schedule({
     required this.id,
@@ -48,6 +49,7 @@ class Schedule {
     this.currentStopName,
     this.nextStopSequence,
     this.nextStopName,
+    this.isSpareTrip = false,
   });
 
   factory Schedule.fromJson(Map<String, dynamic> json) {
@@ -88,6 +90,7 @@ class Schedule {
       currentStopName: json['current_stop_name'] as String?,
       nextStopSequence: json['next_stop_sequence'] as int?,
       nextStopName: json['next_stop_name'] as String?,
+      isSpareTrip: json['is_spare_trip'] as bool? ?? false,
     );
   }
 

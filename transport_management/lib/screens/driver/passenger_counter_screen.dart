@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'dart:async';
 import '../../models/schedule_model.dart';
 import '../../services/api_service.dart';
 
@@ -18,6 +19,7 @@ class _PassengerCounterScreenState extends State<PassengerCounterScreen> {
   bool _isLoading = true;
   bool _isSyncing = false;
   String? _error;
+  Timer? _debounceTimer;
 
   final List<Map<String, dynamic>> _history = [];
 
@@ -273,7 +275,7 @@ class _PassengerCounterScreenState extends State<PassengerCounterScreen> {
                 children: [
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: _currentCount > 0 && !_isSyncing
+                      onPressed: _currentCount > 0
                           ? () => _removePassengers(1)
                           : null,
                       style: ElevatedButton.styleFrom(
@@ -296,7 +298,7 @@ class _PassengerCounterScreenState extends State<PassengerCounterScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: _currentCount < _busCapacity && !_isSyncing
+                      onPressed: _currentCount < _busCapacity
                           ? () => _addPassengers(1)
                           : null,
                       style: ElevatedButton.styleFrom(
@@ -323,7 +325,7 @@ class _PassengerCounterScreenState extends State<PassengerCounterScreen> {
                 children: [
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: _currentCount >= 5 && !_isSyncing
+                      onPressed: _currentCount >= 5
                           ? () => _removePassengers(5)
                           : null,
                       style: ElevatedButton.styleFrom(
@@ -340,7 +342,7 @@ class _PassengerCounterScreenState extends State<PassengerCounterScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: !_isSyncing ? _resetCounter : null,
+                      onPressed: _resetCounter,
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
@@ -353,7 +355,7 @@ class _PassengerCounterScreenState extends State<PassengerCounterScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: _currentCount <= _busCapacity - 5 && !_isSyncing
+                      onPressed: _currentCount <= _busCapacity - 5
                           ? () => _addPassengers(5)
                           : null,
                       style: ElevatedButton.styleFrom(
@@ -387,7 +389,7 @@ class _PassengerCounterScreenState extends State<PassengerCounterScreen> {
   }
 
   void _addPassengers(int count) {
-    if (_activeSchedule == null || _isSyncing) return;
+    if (_activeSchedule == null) return;
     
     setState(() {
       _currentCount += count;
@@ -397,11 +399,11 @@ class _PassengerCounterScreenState extends State<PassengerCounterScreen> {
       _addToHistory('Added $count passenger${count > 1 ? 's' : ''}');
     });
     
-    _syncWithBackend();
+    _debounceSync();
   }
 
   void _removePassengers(int count) {
-    if (_activeSchedule == null || _isSyncing) return;
+    if (_activeSchedule == null) return;
     
     setState(() {
       _currentCount -= count;
@@ -411,11 +413,16 @@ class _PassengerCounterScreenState extends State<PassengerCounterScreen> {
       _addToHistory('Removed $count passenger${count > 1 ? 's' : ''}');
     });
     
-    _syncWithBackend();
+    _debounceSync();
+  }
+
+  void _debounceSync() {
+    if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 600), _syncWithBackend);
   }
 
   Future<void> _syncWithBackend() async {
-    if (_activeSchedule == null || _isSyncing) return;
+    if (_activeSchedule == null) return;
 
     setState(() => _isSyncing = true);
 
