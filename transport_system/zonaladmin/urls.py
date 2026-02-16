@@ -37,4 +37,6 @@ urlpatterns = [
     path("routes/<int:route_id>/stops/add/", views.add_stop, name="add-stop"),
     path("routes/<int:route_id>/stops/<int:stop_id>/edit/", views.edit_stop, name="edit-stop"),
     path("routes/<int:route_id>/stops/<int:stop_id>/delete/", views.delete_stop, name="delete-stop"),
+    
+    path("weekly-profit/", views.weekly_profit_dashboard, name="weekly-profit"),
 ]

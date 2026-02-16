@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -12,6 +12,8 @@ from schedules.models import Schedule, Bus
 from routes.models import Route, Stop
 from demand.models import DemandAlert
 from django.contrib import messages
+from schedules.models import WeeklyBusPerformance, BusRouteAssignment
+from django.db.models import Sum, Avg
 
 # Alert engines – ONLY these (❌ no build_prediction_alerts_for_ui)
 from zonaladmin.logic.alert_engine import (
@@ -1305,3 +1307,84 @@ def all_routes_for_stops(request):
     }
     
     return render(request, "zonaladmin/all_routes_for_stops.html", context)
+
+@login_required
+def weekly_profit_dashboard(request):
+    """
+    Show weekly profit data and next week assignments.
+    Demonstrates fair rotation system.
+    """
+    user = request.user
+    
+    # Get latest week's performance data
+    latest_week = WeeklyBusPerformance.objects.values('week_start_date').distinct().order_by('-week_start_date').first()
+    
+    if not latest_week:
+        context = {
+            'user': user,
+            'no_data': True,
+            'message': 'No profit data yet. Run: python manage.py generate_week_demo'
+        }
+        return render(request, "zonaladmin/weekly_profit.html", context)
+    
+    week_start = latest_week['week_start_date']
+    
+    # Get all performances for this week (zone-filtered)
+    performances = WeeklyBusPerformance.objects.filter(
+        week_start_date=week_start
+    ).select_related('bus').order_by('-total_profit')
+    
+    # Apply zone filter if zonal admin
+    if getattr(user, "role", None) == "zonal_admin" and getattr(user, "zone_id", None):
+        # Filter to buses in their zone's routes
+        zone_routes = Route.objects.filter(zone=user.zone)
+        zone_schedules = Schedule.objects.filter(
+            route__in=zone_routes,
+            date__gte=week_start,
+            date__lte=week_start + timedelta(days=6)
+        ).values_list('bus_id', flat=True).distinct()
+        performances = performances.filter(bus_id__in=zone_schedules)
+    
+    # Calculate summary stats
+    total_profit = performances.aggregate(Sum('total_profit'))['total_profit__sum'] or 0
+    total_passengers = performances.aggregate(Sum('total_passengers'))['total_passengers__sum'] or 0
+    avg_profit_per_bus = performances.aggregate(Avg('total_profit'))['total_profit__avg'] or 0
+    
+    # Top and bottom performers
+    top_5 = performances[:5]
+    bottom_5 = performances.order_by('total_profit')[:5]
+    
+    # Get next week assignments
+    next_week_start = week_start + timedelta(days=7)
+    next_assignments = BusRouteAssignment.objects.filter(
+        week_start_date=next_week_start,
+        is_active=True
+    ).select_related('bus', 'route')
+    
+    # Apply zone filter for assignments
+    if getattr(user, "role", None) == "zonal_admin" and getattr(user, "zone_id", None):
+        next_assignments = next_assignments.filter(route__zone=user.zone)
+    
+    context = {
+        'user': user,
+        'week_start': week_start,
+        'week_end': week_start + timedelta(days=6),
+        'next_week_start': next_week_start,
+        
+        # Summary stats
+        'total_profit': total_profit,
+        'total_passengers': total_passengers,
+        'avg_profit_per_bus': avg_profit_per_bus,
+        'bus_count': performances.count(),
+        
+        # Performance data
+        'performances': performances,
+        'top_5': top_5,
+        'bottom_5': bottom_5,
+        
+        # Next week
+        'next_assignments': next_assignments,
+        'has_next_week': next_assignments.exists(),
+    }
+    
+    return render(request, "zonaladmin/weekly_profit.html", context)

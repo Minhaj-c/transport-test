@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Weekly Profit Dashboard</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #eef1f7;
+            color: #111827;
+        }
+        
+        .header {
+            background: #004aad;
+            color: white;
+            padding: 16px 32px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
+        
+        .header h2 { margin: 0; font-size: 20px; }
+        
+        .back-link {
+            display: inline-block;
+            color: #dbe7ff;
+            text-decoration: none;
+            font-size: 13px;
+            margin-top: 6px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 24px auto;
+            padding: 0 20px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .stat-card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        
+        .stat-label {
+            font-size: 11px;
+            color: #6b7280;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #004aad;
+        }
+        
+        .card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        
+        th, td {
+            text-align: left;
+            padding: 12px 10px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        th {
+            background: #f9fafb;
+            font-weight: 600;
+            color: #6b7280;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+        
+        tr:hover td {
+            background: #f9fafb;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        
+        .badge-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .badge-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .badge-danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .profit-positive {
+            color: #059669;
+            font-weight: 600;
+        }
+        
+        .profit-negative {
+            color: #dc2626;
+            font-weight: 600;
+        }
+        
+        .rank-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #e5e7eb;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .rank-1 { background: #fbbf24; color: white; }
+        .rank-2 { background: #9ca3af; color: white; }
+        .rank-3 { background: #cd7f32; color: white; }
+        
+        .alert {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+        }
+        
+        .alert-info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #60a5fa;
+        }
+        
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+        
+        .rotation-icon {
+            font-size: 18px;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h2>💰 Weekly Profit Dashboard</h2>
+    <a href="/zonal-admin/" class="back-link">← Back to Dashboard</a>
+</div>
+
+<div class="container">
+    
+    {% if no_data %}
+    <div class="card">
+        <div class="alert alert-info">
+            <strong>ℹ️ No Data Available</strong><br>
+            {{ message }}
+        </div>
+    </div>
+    {% else %}
+    
+    <!-- Week Info -->
+    <div class="alert alert-info">
+        <strong>📅 Week:</strong> {{ week_start }} to {{ week_end }} (7 days)
+    </div>
+    
+    <!-- Summary Stats -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">Total Zone Profit</div>
+            <div class="stat-value">₹{{ total_profit|floatformat:0 }}</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-label">Total Passengers</div>
+            <div class="stat-value">{{ total_passengers|floatformat:0 }}</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-label">Average Profit/Bus</div>
+            <div class="stat-value">₹{{ avg_profit_per_bus|floatformat:0 }}</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-label">Active Buses</div>
+            <div class="stat-value">{{ bus_count }}</div>
+        </div>
+    </div>
+    
+    <!-- Top Performers -->
+    <div class="card">
+        <h3 class="card-title">🏆 Top 5 Performers (This Week)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Bus</th>
+                    <th>Trips</th>
+                    <th>Passengers</th>
+                    <th>Revenue</th>
+                    <th>Fuel Cost</th>
+                    <th>Profit</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for perf in top_5 %}
+                <tr>
+                    <td>
+                        <span class="rank-badge rank-{{ perf.profit_rank }}">
+                            {{ perf.profit_rank }}
+                        </span>
+                    </td>
+                    <td><strong>{{ perf.bus.number_plate }}</strong></td>
+                    <td>{{ perf.total_trips }}</td>
+                    <td>{{ perf.total_passengers }}</td>
+                    <td>₹{{ perf.total_revenue|floatformat:0 }}</td>
+                    <td>₹{{ perf.total_fuel_cost|floatformat:0 }}</td>
+                    <td class="profit-positive">₹{{ perf.total_profit|floatformat:0 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Bottom Performers -->
+    <div class="card">
+        <h3 class="card-title">📉 Bottom 5 Performers (This Week)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Bus</th>
+                    <th>Trips</th>
+                    <th>Passengers</th>
+                    <th>Revenue</th>
+                    <th>Fuel Cost</th>
+                    <th>Profit</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for perf in bottom_5 %}
+                <tr>
+                    <td>
+                        <span class="rank-badge">{{ perf.profit_rank }}</span>
+                    </td>
+                    <td><strong>{{ perf.bus.number_plate }}</strong></td>
+                    <td>{{ perf.total_trips }}</td>
+                    <td>{{ perf.total_passengers }}</td>
+                    <td>₹{{ perf.total_revenue|floatformat:0 }}</td>
+                    <td>₹{{ perf.total_fuel_cost|floatformat:0 }}</td>
+                    <td class="profit-negative">₹{{ perf.total_profit|floatformat:0 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Next Week Assignments -->
+    {% if has_next_week %}
+    <div class="card">
+        <h3 class="card-title">
+            <span class="rotation-icon">🔄</span>
+            Next Week Assignments ({{ next_week_start }})
+        </h3>
+        
+        <div class="alert alert-success" style="margin-bottom: 16px;">
+            <strong>✅ Fair Rotation Active!</strong><br>
+            Low-profit buses from this week have been assigned to high-profit routes next week.
+        </div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Bus</th>
+                    <th>Assigned Route</th>
+                    <th>Expected Profit</th>
+                    <th>Assignment Reason</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for assignment in next_assignments %}
+                <tr>
+                    <td><strong>{{ assignment.bus.number_plate }}</strong></td>
+                    <td>Route {{ assignment.route.number }} – {{ assignment.route.name }}</td>
+                    <td>₹{{ assignment.expected_profit|floatformat:0 }}</td>
+                    <td>
+                        <small style="color: #6b7280;">
+                            {{ assignment.assignment_reason }}
+                        </small>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="card">
+        <div class="alert alert-info">
+            <strong>📋 Next Week Schedule Not Generated Yet</strong><br>
+            Run: <code>python manage.py generate_next_week --week-start={{ next_week_start }}</code>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- All Buses Performance -->
+    <div class="card">
+        <h3 class="card-title">📊 All Buses Performance</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Bus</th>
+                    <th>Trips</th>
+                    <th>Passengers</th>
+                    <th>Profit</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for perf in performances %}
+                <tr>
+                    <td>{{ perf.profit_rank }}</td>
+                    <td><strong>{{ perf.bus.number_plate }}</strong></td>
+                    <td>{{ perf.total_trips }}</td>
+                    <td>{{ perf.total_passengers }}</td>
+                    <td>
+                        {% if perf.total_profit > 0 %}
+                            <span class="profit-positive">₹{{ perf.total_profit|floatformat:0 }}</span>
+                        {% else %}
+                            <span class="profit-negative">₹{{ perf.total_profit|floatformat:0 }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if perf.profit_rank <= 5 %}
+                            <span class="badge badge-success">Top Performer</span>
+                        {% elif perf.profit_rank >= bus_count|add:"-4" %}
+                            <span class="badge badge-warning">Needs Better Route</span>
+                        {% else %}
+                            <span class="badge">Average</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    {% endif %}
+
+</div>
+
+</body>
+</html>

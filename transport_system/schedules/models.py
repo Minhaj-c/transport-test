@@ -6,7 +6,9 @@ Manages buses and their schedules
 from django.db import models
 from django.conf import settings
 from routes.models import Route
-from demand.models import DemandAlert   # 👈 NEW import
+from demand.models import DemandAlert 
+from django.utils import timezone
+from decimal import Decimal
 
 
 class Bus(models.Model):
@@ -279,3 +281,129 @@ class BusSchedule(models.Model):
         end = datetime.combine(self.date, self.end_time)
         duration = (end - start).total_seconds() / 3600
         return round(duration, 1)
+
+
+class WeeklyBusPerformance(models.Model):
+    """
+    Track each bus's performance for one week.
+    Used to determine fair rotation for next week.
+    """
+    bus = models.ForeignKey('schedules.Bus', on_delete=models.CASCADE)
+    week_start_date = models.DateField()
+    week_end_date = models.DateField()
+    
+    # Performance metrics
+    total_trips = models.IntegerField(default=0)
+    total_passengers = models.IntegerField(default=0)
+    total_distance_km = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    
+    # Financial metrics
+    total_revenue = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total_fuel_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total_profit = models.DecimalField(max_digits=10, decimal_places=2, default=0)  # KEY METRIC
+    
+    # Ranking (for fair rotation)
+    profit_rank = models.IntegerField(null=True, blank=True)  # 1 = highest earner
+    
+    # Metadata
+    calculated_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-total_profit']
+        unique_together = ['bus', 'week_start_date']
+    
+    def __str__(self):
+        return f"{self.bus.number_plate} - Week {self.week_start_date}: ₹{self.total_profit}"
+
+
+class RouteProfitability(models.Model):
+    """
+    Track each route's profitability for one week.
+    Used to identify which routes are most profitable.
+    """
+    route = models.ForeignKey('routes.Route', on_delete=models.CASCADE)
+    week_start_date = models.DateField()
+    week_end_date = models.DateField()
+    
+    # Metrics
+    total_trips = models.IntegerField(default=0)
+    average_passengers_per_trip = models.DecimalField(max_digits=5, decimal_places=2, default=0)
+    average_profit_per_trip = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total_profit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    
+    # Ranking
+    profitability_rank = models.IntegerField(null=True, blank=True)  # 1 = best route
+    
+    class Meta:
+        ordering = ['-average_profit_per_trip']
+        unique_together = ['route', 'week_start_date']
+    
+    def __str__(self):
+        return f"Route {self.route.number} - Week {self.week_start_date}: ₹{self.average_profit_per_trip}/trip"
+
+
+class BusRouteAssignment(models.Model):
+    """
+    Track which bus is assigned to which route for a specific week.
+    This enables the fair rotation system.
+    """
+    bus = models.ForeignKey('schedules.Bus', on_delete=models.CASCADE)
+    route = models.ForeignKey('routes.Route', on_delete=models.CASCADE)
+    week_start_date = models.DateField()
+    week_end_date = models.DateField()
+    
+    # Reasoning for assignment
+    assignment_reason = models.TextField(
+        help_text="Why this bus got this route (e.g., 'Low profit last week - assigned high profit route')"
+    )
+    
+    # Expected vs actual
+    expected_profit = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    actual_profit = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['week_start_date', 'bus']
+        unique_together = ['bus', 'week_start_date']
+    
+    def __str__(self):
+        return f"{self.bus.number_plate} → Route {self.route.number} (Week {self.week_start_date})"
+
+
+class SpareBusSchedule(models.Model):
+    """
+    Track when each bus acts as spare bus (1 hour per day).
+    Ensures coverage throughout the day.
+    """
+    bus = models.ForeignKey('schedules.Bus', on_delete=models.CASCADE)
+    date = models.DateField()
+    spare_start_time = models.TimeField()
+    spare_end_time = models.TimeField()
+    
+    # Track if spare bus was used
+    was_dispatched = models.BooleanField(default=False)
+    dispatch_reason = models.TextField(null=True, blank=True)
+    
+    is_active = models.BooleanField(default=True)
+    
+    class Meta:
+        ordering = ['date', 'spare_start_time']
+        unique_together = ['bus', 'date']
+    
+    def __str__(self):
+        return f"{self.bus.number_plate} - Spare on {self.date} ({self.spare_start_time}-{self.spare_end_time})"
+
+
+# Enhancement to existing Schedule model (add these fields if not present)
+"""
+class Schedule(models.Model):
+    # ... existing fields ...
+    
+    # Add these for profit tracking
+    passengers_boarded = models.IntegerField(default=0)
+    revenue = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    fuel_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    profit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+"""
