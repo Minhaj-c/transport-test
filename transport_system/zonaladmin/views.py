@@ -11,6 +11,7 @@ from preinforms.models import PreInform
 from schedules.models import Schedule, Bus
 from routes.models import Route, Stop
 from demand.models import DemandAlert
+from django.contrib import messages
 
 # Alert engines – ONLY these (❌ no build_prediction_alerts_for_ui)
 from zonaladmin.logic.alert_engine import (
@@ -761,3 +762,546 @@ def zonal_schedules(request):
             schedule.starting_stop = None
 
     return render(request, "zonaladmin/schedules.html", {"schedules": schedules})
+
+
+# Add to zonaladmin/views.py
+
+# --------------------------
+# BUS MANAGEMENT
+# --------------------------
+@login_required
+def zonal_buses(request):
+    """
+    List all buses. Zonal admins see all buses (can assign any to their routes).
+    Central admin sees all.
+    """
+    user = request.user
+    
+    # All buses (zonal admins can assign any bus to their routes)
+    buses = Bus.objects.all().order_by("number_plate")
+    
+    # Annotate with current assignment info
+    for bus in buses:
+        # Find current schedule
+        current_schedule = Schedule.objects.filter(
+            bus=bus,
+            date=timezone.localdate(),
+            bus__is_running=True
+        ).select_related('route').first()
+        
+        bus.current_assignment = current_schedule
+    
+    context = {
+        "user": user,
+        "buses": buses,
+    }
+    
+    return render(request, "zonaladmin/buses.html", context)
+
+
+@login_required
+def add_bus(request):
+    """
+    Add a new bus to the fleet.
+    """
+    user = request.user
+    
+    # Only admin and zonal_admin can add buses
+    if not (user.is_superuser or getattr(user, "role", None) in ["admin", "zonal_admin"]):
+        return redirect("zonal-buses")
+    
+    error = None
+    
+    if request.method == "POST":
+        number_plate = request.POST.get("number_plate", "").strip()
+        capacity = request.POST.get("capacity")
+        mileage = request.POST.get("mileage")
+        service_type = request.POST.get("service_type", "all_stop")
+        
+        if not number_plate or not capacity:
+            error = "Number plate and capacity are required."
+        else:
+            # Check if bus already exists
+            if Bus.objects.filter(number_plate=number_plate).exists():
+                error = f"Bus with number plate '{number_plate}' already exists."
+            else:
+                try:
+                    Bus.objects.create(
+                        number_plate=number_plate,
+                        capacity=int(capacity),
+                        mileage=float(mileage) if mileage else 5.0,
+                        service_type=service_type,
+                        is_active=True,
+                    )
+                    return redirect("zonal-buses")
+                except Exception as e:
+                    error = f"Error creating bus: {str(e)}"
+    
+    context = {
+        "user": user,
+        "error": error,
+        "service_types": Bus.SERVICE_TYPES,
+    }
+    
+    return render(request, "zonaladmin/add_bus.html", context)
+
+
+@login_required
+def edit_bus(request, bus_id):
+    """
+    Edit existing bus details.
+    """
+    user = request.user
+    
+    # Only admin and zonal_admin can edit buses
+    if not (user.is_superuser or getattr(user, "role", None) in ["admin", "zonal_admin"]):
+        return redirect("zonal-buses")
+    
+    bus = get_object_or_404(Bus, id=bus_id)
+    error = None
+    
+    if request.method == "POST":
+        number_plate = request.POST.get("number_plate", "").strip()
+        capacity = request.POST.get("capacity")
+        mileage = request.POST.get("mileage")
+        service_type = request.POST.get("service_type")
+        is_active = request.POST.get("is_active") == "on"
+        
+        if not number_plate or not capacity:
+            error = "Number plate and capacity are required."
+        else:
+            # Check if number plate is taken by another bus
+            existing = Bus.objects.filter(number_plate=number_plate).exclude(id=bus_id).first()
+            if existing:
+                error = f"Number plate '{number_plate}' is already used by another bus."
+            else:
+                try:
+                    bus.number_plate = number_plate
+                    bus.capacity = int(capacity)
+                    bus.mileage = float(mileage) if mileage else bus.mileage
+                    bus.service_type = service_type
+                    bus.is_active = is_active
+                    bus.save()
+                    return redirect("zonal-buses")
+                except Exception as e:
+                    error = f"Error updating bus: {str(e)}"
+    
+    context = {
+        "user": user,
+        "bus": bus,
+        "error": error,
+        "service_types": Bus.SERVICE_TYPES,
+    }
+    
+    return render(request, "zonaladmin/edit_bus.html", context)
+
+
+# --------------------------
+# ROUTE MANAGEMENT
+# --------------------------
+@login_required
+def manage_routes(request):
+    """
+    Enhanced route management page showing routes in the zone.
+    """
+    user = request.user
+    
+    # Zone-filtered routes
+    routes = filter_zone(Route.objects.all(), user).order_by("number")
+    
+    # Annotate with stop count
+    stop_counts_qs = Stop.objects.values("route_id").annotate(count=Count("id"))
+    stop_count_map = {row["route_id"]: row["count"] for row in stop_counts_qs}
+    
+    for r in routes:
+        r.stop_count = stop_count_map.get(r.id, 0)
+    
+    context = {
+        "user": user,
+        "routes": routes,
+    }
+    
+    return render(request, "zonaladmin/manage_routes.html", context)
+
+
+@login_required
+def add_route(request):
+    """
+    Add a new route in the zonal admin's zone.
+    After creation, redirects to manage stops page.
+    """
+    user = request.user
+    
+    # Only admin and zonal_admin can add routes
+    if not (user.is_superuser or getattr(user, "role", None) in ["admin", "zonal_admin"]):
+        messages.error(request, "Permission denied.")
+        return redirect("manage-routes")
+    
+    error = None
+    
+    if request.method == "POST":
+        number = request.POST.get("number", "").strip()
+        name = request.POST.get("name", "").strip()
+        description = request.POST.get("description", "").strip()
+        origin = request.POST.get("origin", "").strip()
+        destination = request.POST.get("destination", "").strip()
+        total_distance = request.POST.get("total_distance")
+        duration = request.POST.get("duration")
+        turnaround_time = request.POST.get("turnaround_time", "0.33")
+        buffer_time = request.POST.get("buffer_time", "0.16")
+        
+        if not all([number, name, origin, destination, total_distance, duration]):
+            error = "All required fields must be filled."
+        else:
+            # Check if route number already exists
+            if Route.objects.filter(number=number).exists():
+                error = f"Route number '{number}' already exists."
+            else:
+                try:
+                    # Assign zone for zonal admin
+                    zone = None
+                    if getattr(user, "role", None) == "zonal_admin":
+                        zone = user.zone
+                    
+                    # Create the route
+                    route = Route.objects.create(
+                        number=number,
+                        name=name,
+                        description=description,
+                        origin=origin,
+                        destination=destination,
+                        total_distance=float(total_distance),
+                        duration=float(duration),
+                        turnaround_time=float(turnaround_time) if turnaround_time else 0.33,
+                        buffer_time=float(buffer_time) if buffer_time else 0.16,
+                        zone=zone,
+                    )
+                    
+                    messages.success(request, f"Route {number} created successfully! Now add stops.")
+                    
+                    # 🔥 REDIRECT TO MANAGE STOPS PAGE
+                    return redirect("manage-stops", route_id=route.id)
+                    
+                except Exception as e:
+                    error = f"Error creating route: {str(e)}"
+    
+    context = {
+        "user": user,
+        "error": error,
+    }
+    
+    return render(request, "zonaladmin/add_route.html", context)
+
+@login_required
+def edit_route(request, route_id):
+    """
+    Edit existing route.
+    """
+    user = request.user
+    
+    # Only admin and zonal_admin can edit routes
+    if not (user.is_superuser or getattr(user, "role", None) in ["admin", "zonal_admin"]):
+        return redirect("manage-routes")
+    
+    route = get_object_or_404(Route, id=route_id)
+    
+    # Zonal admin: ensure route belongs to their zone
+    if getattr(user, "role", None) == "zonal_admin" and route.zone != user.zone:
+        return redirect("manage-routes")
+    
+    error = None
+    
+    if request.method == "POST":
+        number = request.POST.get("number", "").strip()
+        name = request.POST.get("name", "").strip()
+        origin = request.POST.get("origin", "").strip()
+        destination = request.POST.get("destination", "").strip()
+        total_distance = request.POST.get("total_distance")
+        duration = request.POST.get("duration")
+        
+        if not all([number, name, origin, destination, total_distance, duration]):
+            error = "All fields are required."
+        else:
+            # Check if route number is taken by another route
+            existing = Route.objects.filter(number=number).exclude(id=route_id).first()
+            if existing:
+                error = f"Route number '{number}' is already used."
+            else:
+                try:
+                    route.number = number
+                    route.name = name
+                    route.origin = origin
+                    route.destination = destination
+                    route.total_distance = float(total_distance)
+                    route.duration = float(duration)
+                    route.save()
+                    return redirect("manage-routes")
+                except Exception as e:
+                    error = f"Error updating route: {str(e)}"
+    
+    # Load stops for this route
+    stops = route.stops.all().order_by("sequence")
+    
+    context = {
+        "user": user,
+        "route": route,
+        "stops": stops,
+        "error": error,
+    }
+    
+    return render(request, "zonaladmin/edit_route.html", context)
+
+@login_required
+def manage_stops(request, route_id):
+    """
+    View and manage stops for a specific route.
+    Shows list of stops with add/edit/delete options.
+    """
+    user = request.user
+    
+    # Get route
+    route = get_object_or_404(Route, id=route_id)
+    
+    # Zonal admin: ensure route belongs to their zone
+    if getattr(user, "role", None) == "zonal_admin" and getattr(user, "zone_id", None):
+        if route.zone_id != user.zone_id:
+            messages.error(request, "You can only manage stops for routes in your zone.")
+            return redirect("manage-routes")
+    
+    # Get all stops for this route ordered by sequence
+    stops = route.stops.all().order_by("sequence")
+    
+    # Calculate next sequence number
+    next_sequence = (stops.count() + 1) if stops.exists() else 1
+    
+    context = {
+        "user": user,
+        "route": route,
+        "stops": stops,
+        "next_sequence": next_sequence,
+    }
+    
+    return render(request, "zonaladmin/manage_stops.html", context)
+
+
+@login_required
+def add_stop(request, route_id):
+    """
+    Add a new stop to a route.
+    """
+    user = request.user
+    
+    # Only admin and zonal_admin can add stops
+    if not (user.is_superuser or getattr(user, "role", None) in ["admin", "zonal_admin"]):
+        messages.error(request, "Permission denied.")
+        return redirect("manage-routes")
+    
+    route = get_object_or_404(Route, id=route_id)
+    
+    # Zonal admin: ensure route belongs to their zone
+    if getattr(user, "role", None) == "zonal_admin" and getattr(user, "zone_id", None):
+        if route.zone_id != user.zone_id:
+            messages.error(request, "You can only manage stops for routes in your zone.")
+            return redirect("manage-routes")
+    
+    # Calculate next sequence
+    next_sequence = route.stops.count() + 1
+    
+    if request.method == "POST":
+        sequence = request.POST.get("sequence")
+        name = request.POST.get("name", "").strip()
+        distance_from_origin = request.POST.get("distance_from_origin")
+        is_limited_stop = request.POST.get("is_limited_stop") == "on"
+        
+        # Validation
+        if not all([sequence, name, distance_from_origin]):
+            messages.error(request, "Sequence, name, and distance are required.")
+            return redirect("manage-stops", route_id=route_id)
+        
+        try:
+            sequence_int = int(sequence)
+            distance_float = float(distance_from_origin)
+            
+            # Check if sequence already exists
+            if route.stops.filter(sequence=sequence_int).exists():
+                messages.error(request, f"Stop with sequence {sequence_int} already exists on this route.")
+                return redirect("manage-stops", route_id=route_id)
+            
+            # Check if stop name already exists on this route
+            if route.stops.filter(name=name).exists():
+                messages.error(request, f"Stop named '{name}' already exists on this route.")
+                return redirect("manage-stops", route_id=route_id)
+            
+            # Create stop
+            Stop.objects.create(
+                route=route,
+                sequence=sequence_int,
+                name=name,
+                distance_from_origin=distance_float,
+                is_limited_stop=is_limited_stop,
+            )
+            messages.success(request, f"Stop '{name}' added successfully!")
+            return redirect("manage-stops", route_id=route_id)
+            
+        except ValueError:
+            messages.error(request, "Invalid sequence or distance value.")
+            return redirect("manage-stops", route_id=route_id)
+        except Exception as e:
+            messages.error(request, f"Error creating stop: {str(e)}")
+            return redirect("manage-stops", route_id=route_id)
+    
+    context = {
+        "user": user,
+        "route": route,
+        "next_sequence": next_sequence,
+    }
+    
+    return render(request, "zonaladmin/add_stop.html", context)
+
+
+@login_required
+def edit_stop(request, route_id, stop_id):
+    """
+    Edit existing stop on a route.
+    """
+    user = request.user
+    
+    # Only admin and zonal_admin can edit stops
+    if not (user.is_superuser or getattr(user, "role", None) in ["admin", "zonal_admin"]):
+        messages.error(request, "Permission denied.")
+        return redirect("manage-routes")
+    
+    route = get_object_or_404(Route, id=route_id)
+    stop = get_object_or_404(Stop, id=stop_id, route=route)
+    
+    # Zonal admin: ensure route belongs to their zone
+    if getattr(user, "role", None) == "zonal_admin" and getattr(user, "zone_id", None):
+        if route.zone_id != user.zone_id:
+            messages.error(request, "You can only manage stops for routes in your zone.")
+            return redirect("manage-routes")
+    
+    if request.method == "POST":
+        sequence = request.POST.get("sequence")
+        name = request.POST.get("name", "").strip()
+        distance_from_origin = request.POST.get("distance_from_origin")
+        is_limited_stop = request.POST.get("is_limited_stop") == "on"
+        
+        # Validation
+        if not all([sequence, name, distance_from_origin]):
+            messages.error(request, "Sequence, name, and distance are required.")
+            return redirect("manage-stops", route_id=route_id)
+        
+        try:
+            sequence_int = int(sequence)
+            distance_float = float(distance_from_origin)
+            
+            # Check if sequence is taken by another stop
+            existing_seq = route.stops.filter(sequence=sequence_int).exclude(id=stop_id).first()
+            if existing_seq:
+                messages.error(request, f"Sequence {sequence_int} is already used by stop '{existing_seq.name}'.")
+                return redirect("manage-stops", route_id=route_id)
+            
+            # Check if name is taken by another stop
+            existing_name = route.stops.filter(name=name).exclude(id=stop_id).first()
+            if existing_name:
+                messages.error(request, f"Stop name '{name}' is already used on this route.")
+                return redirect("manage-stops", route_id=route_id)
+            
+            # Update stop
+            stop.sequence = sequence_int
+            stop.name = name
+            stop.distance_from_origin = distance_float
+            stop.is_limited_stop = is_limited_stop
+            stop.save()
+            
+            messages.success(request, f"Stop '{stop.name}' updated successfully!")
+            return redirect("manage-stops", route_id=route_id)
+            
+        except ValueError:
+            messages.error(request, "Invalid sequence or distance value.")
+            return redirect("manage-stops", route_id=route_id)
+        except Exception as e:
+            messages.error(request, f"Error updating stop: {str(e)}")
+            return redirect("manage-stops", route_id=route_id)
+    
+    context = {
+        "user": user,
+        "route": route,
+        "stop": stop,
+    }
+    
+    return render(request, "zonaladmin/edit_stop.html", context)
+
+
+@login_required
+def delete_stop(request, route_id, stop_id):
+    """
+    Delete a stop from a route.
+    """
+    user = request.user
+    
+    # Only admin and zonal_admin can delete stops
+    if not (user.is_superuser or getattr(user, "role", None) in ["admin", "zonal_admin"]):
+        messages.error(request, "Permission denied.")
+        return redirect("manage-routes")
+    
+    route = get_object_or_404(Route, id=route_id)
+    stop = get_object_or_404(Stop, id=stop_id, route=route)
+    
+    # Zonal admin: ensure route belongs to their zone
+    if getattr(user, "role", None) == "zonal_admin" and getattr(user, "zone_id", None):
+        if route.zone_id != user.zone_id:
+            messages.error(request, "You can only manage stops for routes in your zone.")
+            return redirect("manage-routes")
+    
+    if request.method == "POST":
+        stop_name = stop.name
+        
+        # Check if this stop is used in any preinforms or demand alerts
+        # (Optional: You may want to prevent deletion if stop is actively used)
+        preinform_count = PreInform.objects.filter(
+            boarding_stop=stop,
+            status__in=["pending", "noted"]
+        ).count()
+        
+        if preinform_count > 0:
+            messages.warning(
+                request, 
+                f"Warning: {preinform_count} active pre-informs reference this stop. "
+                f"Deleting anyway."
+            )
+        
+        # Delete the stop
+        stop.delete()
+        messages.success(request, f"Stop '{stop_name}' deleted successfully!")
+        return redirect("manage-stops", route_id=route_id)
+    
+    context = {
+        "user": user,
+        "route": route,
+        "stop": stop,
+    }
+    
+    return render(request, "zonaladmin/delete_stop.html", context)
+
+@login_required
+def all_routes_for_stops(request):
+    """
+    Show all routes so admin can select which route's stops to manage.
+    This is the landing page when clicking "Stops" in header.
+    """
+    user = request.user
+    
+    # Get zone-filtered routes
+    routes = filter_zone(Route.objects.all(), user).order_by("number")
+    
+    # Add stop count to each route
+    from django.db.models import Count
+    routes = routes.annotate(stop_count=Count('stops'))
+    
+    context = {
+        "user": user,
+        "routes": routes,
+    }
+    
+    return render(request, "zonaladmin/all_routes_for_stops.html", context)

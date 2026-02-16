@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Bus Management – Zonal Admin</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; background: #eef1f7; }
+        .header {
+            background: #004aad; padding: 18px 30px; color: white;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .header h2 { margin: 0; }
+        .header a { color: #dbe7ff; text-decoration: none; margin-left: 16px; font-size: 14px; }
+        .container { width: 90%; margin: 25px auto 40px; }
+        .card {
+            background: #ffffff; padding: 18px 20px; border-radius: 10px;
+            box-shadow: 0px 3px 8px rgba(0,0,0,0.12); margin-bottom: 16px;
+        }
+        .btn-primary {
+            display: inline-block; padding: 8px 16px; background: #0275d8;
+            color: white; border-radius: 6px; text-decoration: none; font-size: 14px;
+        }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { background: #dfe4ea; padding: 10px; text-align: left; font-size: 13px; }
+        td { padding: 9px 10px; border-bottom: 1px solid #e3e3e3; font-size: 13px; }
+        .badge {
+            padding: 3px 8px; border-radius: 999px; font-size: 11px;
+            display: inline-block;
+        }
+        .badge-active { background: #dcfce7; color: #166534; }
+        .badge-inactive { background: #fee2e2; color: #b91c1c; }
+        .badge-running { background: #dbeafe; color: #1e40af; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h2>Bus Management – {{ user.zone.name|default:"All Zones" }}</h2>
+    <div>
+        <a href="/zonal-admin/">Dashboard</a>
+        <a href="/zonal-admin/routes/">Routes</a>
+        <a href="/zonal-admin/schedules/">Schedules</a>
+        <a href="/zonal-admin/preinforms/">Pre-Informs</a>
+    </div>
+</div>
+
+<div class="container">
+    <div class="card">
+        <a href="{% url 'add-bus' %}" class="btn-primary">+ Add New Bus</a>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Number Plate</th>
+                    <th>Capacity</th>
+                    <th>Mileage (km/L)</th>
+                    <th>Service Type</th>
+                    <th>Status</th>
+                    <th>Current Assignment</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for bus in buses %}
+                <tr>
+                    <td><strong>{{ bus.number_plate }}</strong></td>
+                    <td>{{ bus.capacity }} seats</td>
+                    <td>{{ bus.mileage }}</td>
+                    <td>{{ bus.get_service_type_display }}</td>
+                    <td>
+                        {% if bus.is_active %}
+                            <span class="badge badge-active">Active</span>
+                        {% else %}
+                            <span class="badge badge-inactive">Inactive</span>
+                        {% endif %}
+                        
+                        {% if bus.is_running %}
+                            <span class="badge badge-running">Running</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if bus.current_assignment %}
+                            Route {{ bus.current_assignment.route.number }}
+                            ({{ bus.current_assignment.departure_time }})
+                        {% else %}
+                            <span style="color: #6b7280;">—</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'edit-bus' bus.id %}" 
+                           style="color: #2563eb; text-decoration: none; font-size: 13px;">
+                            Edit
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" style="text-align: center; color: #6b7280; padding: 20px;">
+                        No buses found. Add your first bus above.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+</body>
+</html>

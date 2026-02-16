@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Edit Route – {{ route.number }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; background: #eef1f7; }
+        .header {
+            background: #004aad; padding: 18px 30px; color: white;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .header h2 { margin: 0; }
+        .header a { color: #dbe7ff; text-decoration: none; margin-left: 16px; font-size: 14px; }
+        .container { width: 90%; margin: 25px auto 40px; max-width: 700px; }
+        .card {
+            background: #ffffff; padding: 22px 24px; border-radius: 10px;
+            box-shadow: 0px 3px 8px rgba(0,0,0,0.12); margin-bottom: 16px;
+        }
+        label { display: block; font-weight: bold; margin-top: 12px; font-size: 14px; }
+        input {
+            padding: 9px 10px; width: 100%; margin-top: 6px;
+            border-radius: 6px; border: 1px solid #c4c4c4; font-size: 14px;
+        }
+        .btn-primary {
+            margin-top: 16px; padding: 9px 16px; border-radius: 6px;
+            border: none; background: #0275d8; color: white;
+            font-size: 14px; cursor: pointer; width: 100%;
+        }
+        .error { color: #b91c1c; font-size: 13px; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { background: #dfe4ea; padding: 8px; text-align: left; font-size: 12px; }
+        td { padding: 7px 8px; border-bottom: 1px solid #e3e3e3; font-size: 13px; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h2>Edit Route {{ route.number }}</h2>
+    <div>
+        <a href="/zonal-admin/routes/">Back to Routes</a>
+        <a href="/zonal-admin/">Dashboard</a>
+    </div>
+</div>
+
+<div class="container">
+    <div class="card">
+        <h3 style="margin: 0 0 14px; font-size: 16px;">Route Details</h3>
+        
+        {% if error %}
+            <div class="error">⚠️ {{ error }}</div>
+        {% endif %}
+
+        <form method="POST">
+            {% csrf_token %}
+
+            <label>Route Number *</label>
+            <input type="text" name="number" value="{{ route.number }}" required>
+
+            <label>Route Name *</label>
+            <input type="text" name="name" value="{{ route.name }}" required>
+
+            <label>Origin *</label>
+            <input type="text" name="origin" value="{{ route.origin }}" required>
+
+            <label>Destination *</label>
+            <input type="text" name="destination" value="{{ route.destination }}" required>
+
+            <label>Total Distance (km) *</label>
+            <input type="number" step="0.1" name="total_distance" value="{{ route.total_distance }}" required>
+
+            <label>Duration (hours) *</label>
+            <input type="number" step="0.1" name="duration" value="{{ route.duration }}" required>
+
+            <button type="submit" class="btn-primary">Save Changes</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h3 style="margin: 0 0 10px; font-size: 16px;">
+            Stops on this Route ({{ stops.count }})
+        </h3>
+        
+        {% if stops %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Seq</th>
+                        <th>Stop Name</th>
+                        <th>Distance from Origin</th>
+                        <th>Limited Stop?</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for stop in stops %}
+                    <tr>
+                        <td>{{ stop.sequence }}</td>
+                        <td>{{ stop.name }}</td>
+                        <td>{{ stop.distance_from_origin }} km</td>
+                        <td>
+                            {% if stop.is_limited_stop %}
+                                ✓ Yes
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p style="font-size: 13px; color: #6b7280; margin-top: 8px;">
+                No stops defined yet. Add stops in Django Admin.
+            </p>
+        {% endif %}
+    </div>
+</div>
+
+</body>
+</html>

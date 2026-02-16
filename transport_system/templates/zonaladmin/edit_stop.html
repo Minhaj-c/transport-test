@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Edit Stop – {{ stop.name }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #eef1f7;
+            color: #111827;
+        }
+        
+        .header {
+            background: #004aad;
+            color: white;
+            padding: 16px 32px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
+        
+        .header h2 { margin: 0; font-size: 20px; }
+        
+        .back-link {
+            display: inline-block;
+            color: #dbe7ff;
+            text-decoration: none;
+            font-size: 13px;
+            margin-top: 6px;
+        }
+        
+        .container {
+            max-width: 700px;
+            margin: 24px auto;
+            padding: 0 20px;
+        }
+        
+        .card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 24px;
+        }
+        
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .card-subtitle {
+            font-size: 13px;
+            color: #6b7280;
+            margin-bottom: 20px;
+        }
+        
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .form-group-full {
+            grid-column: 1 / -1;
+        }
+        
+        label {
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 6px;
+        }
+        
+        input {
+            padding: 9px 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: inherit;
+        }
+        
+        input:focus {
+            outline: none;
+            border-color: #004aad;
+        }
+        
+        .help-text {
+            font-size: 11px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+        }
+        
+        .actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+        
+        .btn {
+            padding: 9px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .btn-primary {
+            background: #10b981;
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: #e5e7eb;
+            color: #111827;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h2>✏️ Edit Stop</h2>
+    <a href="{% url 'manage-stops' route.id %}" class="back-link">
+        ← Back to Stops
+    </a>
+</div>
+
+<div class="container">
+    
+    <div class="card">
+        <h3 class="card-title">{{ stop.name }}</h3>
+        <div class="card-subtitle">
+            Route {{ route.number }} – {{ route.name }}
+        </div>
+        
+        <form method="POST">
+            {% csrf_token %}
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="sequence">Sequence *</label>
+                    <input type="number" 
+                           id="sequence" 
+                           name="sequence" 
+                           min="1" 
+                           value="{{ stop.sequence }}" 
+                           required>
+                    <div class="help-text">
+                        Order of this stop on route
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="distance_from_origin">Distance from Origin (km) *</label>
+                    <input type="number" 
+                           id="distance_from_origin" 
+                           name="distance_from_origin" 
+                           step="0.01" 
+                           min="0" 
+                           value="{{ stop.distance_from_origin }}"
+                           required>
+                </div>
+            </div>
+            
+            <div class="form-group form-group-full">
+                <label for="name">Stop Name *</label>
+                <input type="text" 
+                       id="name" 
+                       name="name" 
+                       value="{{ stop.name }}"
+                       required>
+            </div>
+            
+            <div class="checkbox-group">
+                <input type="checkbox" 
+                       id="is_limited_stop" 
+                       name="is_limited_stop"
+                       {% if stop.is_limited_stop %}checked{% endif %}>
+                <label for="is_limited_stop" style="margin: 0;">
+                    Mark as Major/Limited Stop (served by express buses)
+                </label>
+            </div>
+            
+            <div class="actions">
+                <a href="{% url 'manage-stops' route.id %}" class="btn btn-secondary">
+                    Cancel
+                </a>
+                <button type="submit" class="btn btn-primary">
+                    Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+</body>
+</html>

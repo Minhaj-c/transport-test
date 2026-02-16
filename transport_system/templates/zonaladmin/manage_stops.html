@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Manage Stops – Route {{ route.number }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #eef1f7;
+            color: #111827;
+        }
+        
+        .header {
+            background: #004aad;
+            color: white;
+            padding: 16px 32px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
+        
+        .header h2 { margin: 0; font-size: 20px; }
+        
+        .back-link {
+            display: inline-block;
+            color: #dbe7ff;
+            text-decoration: none;
+            font-size: 13px;
+            margin-top: 6px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 24px auto;
+            padding: 0 20px;
+        }
+        
+        .route-info {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+        
+        .info-item label {
+            font-size: 11px;
+            color: #6b7280;
+            text-transform: uppercase;
+        }
+        
+        .info-item div {
+            font-size: 14px;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+        
+        .btn {
+            padding: 9px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            display: inline-block;
+        }
+        
+        .btn-primary {
+            background: #004aad;
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: #e5e7eb;
+            color: #111827;
+        }
+        
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        
+        th, td {
+            text-align: left;
+            padding: 12px 10px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        th {
+            background: #f9fafb;
+            font-weight: 600;
+            color: #6b7280;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+        
+        tr:hover td {
+            background: #f9fafb;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        
+        .badge-major {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .badge-regular {
+            background: #e5e7eb;
+            color: #374151;
+        }
+        
+        .alert {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-size: 13px;
+        }
+        
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+        
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #6b7280;
+        }
+        
+        .actions {
+            display: flex;
+            gap: 8px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h2>📍 Manage Stops – Route {{ route.number }}</h2>
+    <a href="{% url 'manage-routes' %}" class="back-link">
+        ← Back to Routes
+    </a>
+</div>
+
+<div class="container">
+    
+    <!-- Route Info -->
+    <div class="route-info">
+        <div class="info-grid">
+            <div class="info-item">
+                <label>Route Number</label>
+                <div>{{ route.number }}</div>
+            </div>
+            <div class="info-item">
+                <label>Route Name</label>
+                <div>{{ route.name }}</div>
+            </div>
+            <div class="info-item">
+                <label>Origin</label>
+                <div>{{ route.origin }}</div>
+            </div>
+            <div class="info-item">
+                <label>Destination</label>
+                <div>{{ route.destination }}</div>
+            </div>
+            <div class="info-item">
+                <label>Total Distance</label>
+                <div>{{ route.total_distance }} km</div>
+            </div>
+            <div class="info-item">
+                <label>Total Stops</label>
+                <div>{{ stops.count }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Messages -->
+    {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Stops List -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">Stops ({{ stops.count }})</h3>
+            <a href="{% url 'add-stop' route.id %}" class="btn btn-primary">
+                + Add Stop
+            </a>
+        </div>
+        
+        {% if stops %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Sequence</th>
+                    <th>Stop Name</th>
+                    <th>Distance from Origin</th>
+                    <th>Stop Type</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for stop in stops %}
+                <tr>
+                    <td><strong>#{{ stop.sequence }}</strong></td>
+                    <td>{{ stop.name }}</td>
+                    <td>{{ stop.distance_from_origin }} km</td>
+                    <td>
+                        {% if stop.is_limited_stop %}
+                            <span class="badge badge-major">Major Stop</span>
+                        {% else %}
+                            <span class="badge badge-regular">Regular Stop</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="actions">
+                            <a href="{% url 'edit-stop' route.id stop.id %}" 
+                               class="btn btn-secondary" 
+                               style="padding: 5px 10px; font-size: 12px;">
+                                Edit
+                            </a>
+                            <form method="POST" 
+                                  action="{% url 'delete-stop' route.id stop.id %}" 
+                                  style="display: inline;"
+                                  onsubmit="return confirm('Are you sure you want to delete this stop?');">
+                                {% csrf_token %}
+                                <button type="submit" 
+                                        class="btn btn-danger" 
+                                        style="padding: 5px 10px; font-size: 12px;">
+                                    Delete
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <p>No stops defined yet. Click "Add Stop" to add your first stop.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+</body>
+</html>

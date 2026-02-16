@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Route Management – Zonal Admin</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; background: #eef1f7; }
+        .header {
+            background: #004aad; padding: 18px 30px; color: white;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .header h2 { margin: 0; }
+        .header a { color: #dbe7ff; text-decoration: none; margin-left: 16px; font-size: 14px; }
+        .container { width: 90%; margin: 25px auto 40px; }
+        .card {
+            background: #ffffff; padding: 18px 20px; border-radius: 10px;
+            box-shadow: 0px 3px 8px rgba(0,0,0,0.12);
+        }
+        .btn-primary {
+            display: inline-block; padding: 8px 16px; background: #0275d8;
+            color: white; border-radius: 6px; text-decoration: none; font-size: 14px;
+        }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th { background: #dfe4ea; padding: 10px; text-align: left; font-size: 13px; }
+        td { padding: 9px 10px; border-bottom: 1px solid #e3e3e3; font-size: 13px; }
+        .badge {
+            padding: 3px 8px; border-radius: 999px; font-size: 11px;
+            background: #e5e7eb; color: #374151;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h2>Route Management – {{ user.zone.name|default:"All Zones" }}</h2>
+    <div>
+        <a href="/zonal-admin/">Dashboard</a>
+        <a href="/zonal-admin/buses/">Buses</a>
+        <a href="/zonal-admin/schedules/">Schedules</a>
+        <a href="{% url 'manage-stops' route.id %}" class="btn btn-secondary">
+        Manage Stops
+    </a>
+    </div>
+</div>
+
+<div class="container">
+    <div class="card">
+        <a href="{% url 'add-route' %}" class="btn-primary">+ Add New Route</a>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Route No</th>
+                    <th>Name</th>
+                    <th>Origin → Destination</th>
+                    <th>Distance</th>
+                    <th>Duration</th>
+                    <th>Stops</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for route in routes %}
+                <tr>
+                    <td><strong>{{ route.number }}</strong></td>
+                    <td>{{ route.name }}</td>
+                    <td>{{ route.origin }} → {{ route.destination }}</td>
+                    <td>{{ route.total_distance }} km</td>
+                    <td>{{ route.duration }} hrs</td>
+                    <td>
+                        <span class="badge">
+                            {{ route.stop_count }} stop{% if route.stop_count != 1 %}s{% endif %}
+                        </span>
+                    </td>
+                    <td>
+                        <a href="{% url 'edit-route' route.id %}" 
+                           style="color: #2563eb; text-decoration: none; font-size: 13px;">
+                            Edit
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" style="text-align: center; color: #6b7280; padding: 20px;">
+                        No routes found. Add your first route above.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+</body>
+</html>

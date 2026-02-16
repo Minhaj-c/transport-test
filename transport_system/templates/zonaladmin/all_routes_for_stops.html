@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Manage Stops – Select Route</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #eef1f7;
+            color: #111827;
+        }
+        
+        .header {
+            background: #004aad;
+            color: white;
+            padding: 16px 32px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h2 { margin: 0; font-size: 20px; }
+        
+        .header-nav a {
+            color: #dbe7ff;
+            text-decoration: none;
+            margin-left: 16px;
+            font-size: 13px;
+        }
+        
+        .header-nav a:hover {
+            text-decoration: underline;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 24px auto;
+            padding: 0 20px;
+        }
+        
+        .page-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        
+        .page-subtitle {
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 24px;
+        }
+        
+        .card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        
+        th, td {
+            text-align: left;
+            padding: 12px 10px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        th {
+            background: #f9fafb;
+            font-weight: 600;
+            color: #6b7280;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+        
+        tr:hover td {
+            background: #f9fafb;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 500;
+            background: #e5e7eb;
+            color: #374151;
+        }
+        
+        .btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            display: inline-block;
+        }
+        
+        .btn-primary {
+            background: #004aad;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #003a8c;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6b7280;
+        }
+        
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+        
+        .empty-text {
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+        
+        .empty-subtext {
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h2>📍 Stop Management – Select Route</h2>
+    <div class="header-nav">
+        <a href="/zonal-admin/">Dashboard</a>
+        <a href="/zonal-admin/buses/">Buses</a>
+        <a href="/zonal-admin/routes/">Routes</a>
+        <a href="/zonal-admin/schedules/">Schedules</a>
+        <a href="/zonal-admin/preinforms/">Pre-Informs</a>
+        <a href="/zonal-admin/demand/">Demand</a>
+    </div>
+</div>
+
+<div class="container">
+    
+    <h1 class="page-title">Manage Stops</h1>
+    <p class="page-subtitle">
+        Select a route to view and manage its stops
+    </p>
+
+    <div class="card">
+        <h3 class="card-title">Routes in Your Zone ({{ routes.count }})</h3>
+        
+        {% if routes %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Route #</th>
+                    <th>Name</th>
+                    <th>Origin → Destination</th>
+                    <th>Distance</th>
+                    <th>Total Stops</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for route in routes %}
+                <tr>
+                    <td><strong>{{ route.number }}</strong></td>
+                    <td>{{ route.name }}</td>
+                    <td>{{ route.origin }} → {{ route.destination }}</td>
+                    <td>{{ route.total_distance }} km</td>
+                    <td>
+                        <span class="badge">{{ route.stop_count }} stops</span>
+                    </td>
+                    <td>
+                        <a href="{% url 'manage-stops' route.id %}" 
+                           class="btn btn-primary">
+                            Manage Stops
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">🛣️</div>
+            <div class="empty-text">No routes found</div>
+            <div class="empty-subtext">
+                Create routes first, then you can add stops to them.
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+</body>
+</html>
