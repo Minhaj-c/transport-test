@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Schedule Generator</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #eef1f7;
+            color: #111827;
+        }
+
+        .header {
+            background: #004aad;
+            color: white;
+            padding: 16px 32px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .header h2 { font-size: 20px; flex: 1; }
+        .back-link {
+            color: #dbe7ff;
+            text-decoration: none;
+            font-size: 13px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 24px auto;
+            padding: 0 20px;
+        }
+
+        /* ── Messages ── */
+        .alert {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .alert-success { background:#d1fae5; color:#065f46; border:1px solid #6ee7b7; }
+        .alert-warning { background:#fef3c7; color:#92400e; border:1px solid #fcd34d; }
+        .alert-error   { background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; }
+
+        /* ── Cards ── */
+        .card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 22px;
+            margin-bottom: 20px;
+        }
+        .card-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: #111827;
+        }
+
+        /* ── Stat row ── */
+        .stat-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .stat-box {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 14px 16px;
+        }
+        .stat-label { font-size: 11px; color:#6b7280; text-transform:uppercase; margin-bottom:4px; }
+        .stat-value { font-size: 22px; font-weight: 700; color:#004aad; }
+        .stat-value.green { color:#059669; }
+        .stat-value.red   { color:#dc2626; }
+
+        /* ── Week action card ── */
+        .week-card {
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 18px;
+            margin-bottom: 16px;
+            background: white;
+        }
+        .week-card.has-data { border-color:#10b981; background:#f0fdf4; }
+
+        .week-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+        .week-label { font-size: 16px; font-weight: 700; }
+        .week-dates { font-size: 12px; color:#6b7280; margin-top:2px; }
+
+        .badge {
+            padding: 3px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .badge-green { background:#d1fae5; color:#065f46; }
+        .badge-red   { background:#fee2e2; color:#991b1b; }
+        .badge-gray  { background:#f3f4f6; color:#374151; }
+
+        .info-text { font-size: 13px; color:#6b7280; margin-bottom:12px; }
+
+        /* ── Buttons ── */
+        .btn-row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+
+        .btn {
+            padding: 9px 18px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            line-height: 1;
+        }
+        .btn-green  { background:#10b981; color:white; }
+        .btn-green:hover  { background:#059669; }
+        .btn-blue   { background:#3b82f6; color:white; }
+        .btn-blue:hover   { background:#2563eb; }
+        .btn-orange { background:#f59e0b; color:white; }
+        .btn-orange:hover { background:#d97706; }
+        .btn-gray   { background:#6b7280; color:white; }
+        .btn-gray:hover   { background:#4b5563; }
+        .btn:disabled { opacity:0.5; cursor:not-allowed; }
+
+        .check-row { display:flex; align-items:center; gap:8px; margin:10px 0; font-size:13px; }
+
+        /* ── Per-week profit table ── */
+        .profit-section {
+            margin-top: 14px;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 14px;
+        }
+        .profit-section h4 { font-size:13px; font-weight:600; color:#374151; margin-bottom:10px; }
+
+        .profit-table { width:100%; border-collapse:collapse; font-size:12px; }
+        .profit-table th {
+            text-align:left;
+            padding:8px 10px;
+            background:#f9fafb;
+            color:#6b7280;
+            font-size:11px;
+            text-transform:uppercase;
+        }
+        .profit-table td { padding:8px 10px; border-bottom:1px solid #f3f4f6; }
+        .profit-table tr:last-child td { border-bottom:none; }
+        .profit-table tr:hover td { background:#f9fafb; }
+
+        .rank-circle {
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            width:22px;
+            height:22px;
+            border-radius:50%;
+            background:#e5e7eb;
+            font-size:11px;
+            font-weight:700;
+        }
+        .rank-1 { background:#fbbf24; color:white; }
+        .rank-2 { background:#9ca3af; color:white; }
+        .rank-3 { background:#cd7f32; color:white; }
+
+        .profit-pos { color:#059669; font-weight:600; }
+        .profit-neg { color:#dc2626; font-weight:600; }
+
+        /* ── Week list ── */
+        .week-list-item {
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            padding:14px;
+            border-bottom:1px solid #f3f4f6;
+        }
+        .week-list-item:last-child { border-bottom:none; }
+
+        /* ── Current week banner ── */
+        .current-banner {
+            background: linear-gradient(135deg,#004aad,#0066dd);
+            color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .current-banner .label { font-size:12px; opacity:0.8; text-transform:uppercase; margin-bottom:6px; }
+        .current-banner .value { font-size:28px; font-weight:700; }
+        .current-banner .sub   { font-size:13px; opacity:0.8; margin-top:4px; }
+        .banner-grid {
+            display:grid;
+            grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));
+            gap:16px;
+        }
+        .banner-box {
+            background:rgba(255,255,255,0.12);
+            border-radius:8px;
+            padding:14px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h2>📅 Schedule Generator</h2>
+    <a href="/zonal-admin/" class="back-link">← Dashboard</a>
+</div>
+
+<div class="container">
+
+    <!-- Messages -->
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+
+    <!-- ═══ CURRENT WEEK BANNER ═══════════════════════════════════ -->
+    <div class="current-banner">
+        <div class="banner-grid">
+            <div class="banner-box">
+                <div class="label">📍 Current Week</div>
+                <div class="value" style="font-size:15px;">{{ current_week_start }} → {{ current_week_end }}</div>
+            </div>
+            <div class="banner-box">
+                <div class="label">📋 Schedules</div>
+                <div class="value">{{ current_week_count }}</div>
+                <div class="sub">{% if current_week_exists %}Active{% else %}Not Generated{% endif %}</div>
+            </div>
+            <div class="banner-box">
+                <div class="label">💰 Total Profit</div>
+                <div class="value">{% if current_has_profits %}₹{{ current_total_profit|floatformat:0 }}{% else %}—{% endif %}</div>
+                <div class="sub">{% if current_has_profits %}Calculated{% else %}Not Calculated{% endif %}</div>
+            </div>
+            <div class="banner-box">
+                <div class="label">👥 Passengers</div>
+                <div class="value">{% if current_has_profits %}{{ current_total_passengers }}{% else %}—{% endif %}</div>
+                <div class="sub">This Week</div>
+            </div>
+        </div>
+
+        <!-- Current week profit table inside banner -->
+        {% if current_has_profits %}
+        <div style="margin-top:16px; background:rgba(255,255,255,0.08); border-radius:8px; overflow:hidden;">
+            <table style="width:100%; border-collapse:collapse; font-size:12px; color:white;">
+                <thead>
+                    <tr style="background:rgba(0,0,0,0.15);">
+                        <th style="padding:8px 12px; text-align:left;">Rank</th>
+                        <th style="padding:8px 12px; text-align:left;">Bus</th>
+                        <th style="padding:8px 12px; text-align:right;">Passengers</th>
+                        <th style="padding:8px 12px; text-align:right;">Revenue</th>
+                        <th style="padding:8px 12px; text-align:right;">Fuel Cost</th>
+                        <th style="padding:8px 12px; text-align:right;">Profit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for perf in current_week_profits %}
+                    <tr style="border-top:1px solid rgba(255,255,255,0.1);">
+                        <td style="padding:8px 12px;">
+                            <span style="font-weight:700;">{{ perf.profit_rank }}</span>
+                        </td>
+                        <td style="padding:8px 12px; font-weight:600;">{{ perf.bus.number_plate }}</td>
+                        <td style="padding:8px 12px; text-align:right;">{{ perf.total_passengers }}</td>
+                        <td style="padding:8px 12px; text-align:right;">₹{{ perf.total_revenue|floatformat:0 }}</td>
+                        <td style="padding:8px 12px; text-align:right;">₹{{ perf.total_fuel_cost|floatformat:0 }}</td>
+                        <td style="padding:8px 12px; text-align:right; font-weight:700;">₹{{ perf.total_profit|floatformat:0 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ═══ GENERATE BUTTONS ══════════════════════════════════════ -->
+    <div class="card">
+        <div class="card-title">⚙️ Generate Schedules</div>
+
+        <!-- System check -->
+        {% if not resources_ok %}
+        <div class="alert alert-warning">
+            ⚠️ Need at least 1 bus, 1 route, and 1 driver. Currently:
+            {{ bus_count }} buses, {{ route_count }} routes, {{ driver_count }} drivers.
+        </div>
+        {% endif %}
+
+        <!-- Current Week generate -->
+        <div class="week-card {% if current_week_exists %}has-data{% endif %}">
+            <div class="week-header">
+                <div>
+                    <div class="week-label">📍 Current Week</div>
+                    <div class="week-dates">{{ current_week_start }} to {{ current_week_end }}</div>
+                </div>
+                <span class="badge {% if current_week_exists %}badge-green{% else %}badge-red{% endif %}">
+                    {% if current_week_exists %}{{ current_week_count }} Schedules{% else %}No Schedules{% endif %}
+                </span>
+            </div>
+
+            <div class="info-text">
+                {% if current_week_exists %}
+                    ✅ Schedules are ready. Drivers can see their trips on the app.
+                {% else %}
+                    ⚠️ No schedules yet. Click Generate to create this week's schedule.
+                {% endif %}
+            </div>
+
+            <form method="POST" action="{% url 'generate-week-schedules' %}">
+                {% csrf_token %}
+                <input type="hidden" name="week_type" value="current">
+                {% if current_week_exists %}
+                <div class="check-row">
+                    <input type="checkbox" id="replace_curr" name="force_replace" value="yes">
+                    <label for="replace_curr">Replace existing {{ current_week_count }} schedules</label>
+                </div>
+                {% endif %}
+                <div class="btn-row">
+                    <button type="submit" class="btn {% if current_week_exists %}btn-orange{% else %}btn-green{% endif %}"
+                        {% if not resources_ok %}disabled{% endif %}>
+                        {% if current_week_exists %}🔄 Regenerate{% else %}✨ Generate Current Week{% endif %}
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Next Week generate -->
+        <div class="week-card {% if next_week_exists %}has-data{% endif %}">
+            <div class="week-header">
+                <div>
+                    <div class="week-label">⏭️ Next Week</div>
+                    <div class="week-dates">{{ next_week_start }} to {{ next_week_end }}</div>
+                </div>
+                <span class="badge {% if next_week_exists %}badge-green{% else %}badge-gray{% endif %}">
+                    {% if next_week_exists %}{{ next_week_count }} Schedules{% else %}Not Generated{% endif %}
+                </span>
+            </div>
+
+            <div class="info-text">
+                {% if next_week_exists %}
+                    ✅ Next week is ready!
+                {% else %}
+                    💡 Generate next week in advance so drivers are ready.
+                {% endif %}
+            </div>
+
+            <form method="POST" action="{% url 'generate-week-schedules' %}">
+                {% csrf_token %}
+                <input type="hidden" name="week_type" value="next">
+                {% if next_week_exists %}
+                <div class="check-row">
+                    <input type="checkbox" id="replace_next" name="force_replace" value="yes">
+                    <label for="replace_next">Replace existing {{ next_week_count }} schedules</label>
+                </div>
+                {% endif %}
+                <div class="btn-row">
+                    <button type="submit" class="btn {% if next_week_exists %}btn-orange{% else %}btn-green{% endif %}"
+                        {% if not resources_ok %}disabled{% endif %}>
+                        {% if next_week_exists %}🔄 Regenerate Next Week{% else %}✨ Generate Next Week{% endif %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ═══ ALL WEEKS WITH PROFIT ═════════════════════════════════ -->
+    {% if recent_weeks %}
+    <div class="card">
+        <div class="card-title">📊 All Weeks</div>
+
+        {% for week in recent_weeks %}
+        <div style="border:1px solid {% if week.is_current %}#10b981{% else %}#e5e7eb{% endif %};
+                    border-radius:8px; margin-bottom:14px; overflow:hidden;">
+
+            <!-- Week header row -->
+            <div style="padding:14px 16px; background:{% if week.is_current %}#f0fdf4{% else %}#f9fafb{% endif %};
+                        display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <span style="font-weight:700; font-size:14px;">
+                        {% if week.is_current %}📍 {% endif %}
+                        {{ week.start_str }} to {{ week.end_str }}
+                    </span>
+                    {% if week.is_current %}
+                    <span class="badge badge-green" style="margin-left:8px;">Current</span>
+                    {% endif %}
+                    <div style="font-size:12px; color:#6b7280; margin-top:3px;">
+                        {{ week.count }} schedules
+                        {% if week.has_profits %}
+                            | 💰 Total: ₹{{ week.total_profit|floatformat:0 }}
+                            | 👥 {{ week.total_passengers }} passengers
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Action buttons -->
+                <div class="btn-row">
+                    {% if not week.has_profits %}
+                    <form method="POST" action="{% url 'calculate-week-profits' %}" style="display:inline;">
+                        {% csrf_token %}
+                        <input type="hidden" name="week_start" value="{{ week.start_str }}">
+                        <button type="submit" class="btn btn-blue" style="font-size:12px; padding:7px 14px;">
+                            📊 Calculate Profit
+                        </button>
+                    </form>
+                    {% else %}
+                    <span style="font-size:12px; color:#059669; font-weight:600;">✅ Profit Calculated</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Profit table (only shows AFTER calculate profit clicked) -->
+            {% if week.has_profits %}
+            <div style="padding:0;">
+                <table class="profit-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Bus</th>
+                            <th>Trips</th>
+                            <th>Passengers</th>
+                            <th>Revenue</th>
+                            <th>Fuel Cost</th>
+                            <th>Profit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for perf in week.profits %}
+                        <tr>
+                            <td>
+                                <span class="rank-circle rank-{{ perf.profit_rank }}">
+                                    {{ perf.profit_rank }}
+                                </span>
+                            </td>
+                            <td style="font-weight:600;">{{ perf.bus.number_plate }}</td>
+                            <td>{{ perf.total_trips }}</td>
+                            <td>{{ perf.total_passengers }}</td>
+                            <td>₹{{ perf.total_revenue|floatformat:0 }}</td>
+                            <td>₹{{ perf.total_fuel_cost|floatformat:0 }}</td>
+                            <td>
+                                {% if perf.total_profit >= 0 %}
+                                <span class="profit-pos">₹{{ perf.total_profit|floatformat:0 }}</span>
+                                {% else %}
+                                <span class="profit-neg">₹{{ perf.total_profit|floatformat:0 }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+</div>
+</body>
+</html>

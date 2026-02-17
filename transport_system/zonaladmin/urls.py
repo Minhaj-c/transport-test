@@ -39,4 +39,8 @@ urlpatterns = [
     path("routes/<int:route_id>/stops/<int:stop_id>/delete/", views.delete_stop, name="delete-stop"),
     
     path("weekly-profit/", views.weekly_profit_dashboard, name="weekly-profit"),
+    
+    path('schedule-generator/', views.schedule_generator, name='schedule-generator'),
+    path('generate-week-schedules/', views.generate_week_schedules, name='generate-week-schedules'),
+    path('calculate-week-profits/', views.calculate_week_profits, name='calculate-week-profits'),
 ]

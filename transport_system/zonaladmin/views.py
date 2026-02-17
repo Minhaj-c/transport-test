@@ -1,11 +1,9 @@
-from datetime import datetime, timedelta
-
+from datetime import datetime, timedelta,date
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.core.exceptions import FieldDoesNotExist
 from django.db.models import Sum, Count
-
 from users.models import CustomUser
 from preinforms.models import PreInform
 from schedules.models import Schedule, Bus
@@ -14,6 +12,11 @@ from demand.models import DemandAlert
 from django.contrib import messages
 from schedules.models import WeeklyBusPerformance, BusRouteAssignment
 from django.db.models import Sum, Avg
+from django.core.management import call_command
+from io import StringIO
+from schedules.models import Schedule, WeeklyBusPerformance, Bus
+from users.models import CustomUser
+from decimal import Decimal
 
 # Alert engines – ONLY these (❌ no build_prediction_alerts_for_ui)
 from zonaladmin.logic.alert_engine import (
@@ -1388,3 +1391,304 @@ def weekly_profit_dashboard(request):
     }
     
     return render(request, "zonaladmin/weekly_profit.html", context)
+
+
+@login_required
+def schedule_generator(request):
+    """
+    Main schedule management page.
+    Shows current week stats, recent weeks, and profit data.
+    """
+    user = request.user
+
+    if not (user.is_superuser or getattr(user, "role", None) in ["admin", "zonal_admin"]):
+        messages.error(request, "Permission denied.")
+        return redirect("zonal-dashboard")
+
+    today = timezone.now().date()
+    current_week_monday = today - timedelta(days=today.weekday())
+    next_week_monday = current_week_monday + timedelta(days=7)
+
+    # ── Resources ─────────────────────────────────────────────────
+    bus_count = Bus.objects.count()
+    route_count = Route.objects.count()
+    driver_count = CustomUser.objects.filter(role='driver').count()
+
+    # ── Current week schedules ─────────────────────────────────────
+    current_week_end = current_week_monday + timedelta(days=6)
+    current_week_schedules = Schedule.objects.filter(
+        date__gte=current_week_monday,
+        date__lte=current_week_end
+    )
+    current_week_count = current_week_schedules.count()
+
+    # ── Current week profit data ───────────────────────────────────
+    current_week_profits = WeeklyBusPerformance.objects.filter(
+        week_start_date=current_week_monday
+    ).select_related('bus').order_by('profit_rank')
+
+    current_total_profit = sum(p.total_profit for p in current_week_profits)
+    current_total_passengers = sum(p.total_passengers for p in current_week_profits)
+
+    # ── Next week schedules ────────────────────────────────────────
+    next_week_end = next_week_monday + timedelta(days=6)
+    next_week_count = Schedule.objects.filter(
+        date__gte=next_week_monday,
+        date__lte=next_week_end
+    ).count()
+
+    # ── Build recent weeks list ────────────────────────────────────
+    all_dates = Schedule.objects.values_list(
+        'date', flat=True
+    ).distinct().order_by('-date')
+
+    recent_weeks = []
+    seen = set()
+
+    for d in all_dates[:100]:
+        monday = d - timedelta(days=d.weekday())
+        monday_str = monday.strftime('%Y-%m-%d')
+
+        if monday_str not in seen:
+            seen.add(monday_str)
+            sunday = monday + timedelta(days=6)
+            sunday_str = sunday.strftime('%Y-%m-%d')
+
+            # Count schedules for this week
+            week_sched_count = Schedule.objects.filter(
+                date__gte=monday,
+                date__lte=sunday
+            ).count()
+
+            # Get profit data for this week (already calculated)
+            week_profits = WeeklyBusPerformance.objects.filter(
+                week_start_date=monday
+            ).select_related('bus').order_by('profit_rank')
+
+            has_profits = week_profits.exists()
+            week_total_profit = sum(p.total_profit for p in week_profits)
+            week_total_passengers = sum(p.total_passengers for p in week_profits)
+
+            recent_weeks.append({
+                'start_str': monday_str,
+                'end_str': sunday_str,
+                'count': week_sched_count,
+                'has_profits': has_profits,
+                'profits': week_profits,            # All bus profits for this week
+                'total_profit': week_total_profit,
+                'total_passengers': week_total_passengers,
+                'is_current': monday_str == current_week_monday.strftime('%Y-%m-%d'),
+            })
+
+        if len(recent_weeks) >= 8:
+            break
+
+    context = {
+        'user': user,
+        'today': today,
+
+        # Resources
+        'bus_count': bus_count,
+        'route_count': route_count,
+        'driver_count': driver_count,
+        'resources_ok': bus_count >= 1 and route_count >= 1 and driver_count >= 1,
+
+        # Current week
+        'current_week_start': current_week_monday.strftime('%Y-%m-%d'),
+        'current_week_end': current_week_end.strftime('%Y-%m-%d'),
+        'current_week_count': current_week_count,
+        'current_week_exists': current_week_count > 0,
+        'current_week_profits': current_week_profits,
+        'current_total_profit': current_total_profit,
+        'current_total_passengers': current_total_passengers,
+        'current_has_profits': current_week_profits.exists(),
+
+        # Next week
+        'next_week_start': next_week_monday.strftime('%Y-%m-%d'),
+        'next_week_end': next_week_end.strftime('%Y-%m-%d'),
+        'next_week_count': next_week_count,
+        'next_week_exists': next_week_count > 0,
+
+        # All weeks
+        'recent_weeks': recent_weeks,
+    }
+
+    return render(request, "zonaladmin/schedule_generator.html", context)
+
+
+@login_required
+def generate_week_schedules(request):
+    """Generate schedules for current or next week"""
+    user = request.user
+
+    if not (user.is_superuser or getattr(user, "role", None) in ["admin", "zonal_admin"]):
+        messages.error(request, "Permission denied.")
+        return redirect("schedule-generator")
+
+    if request.method != "POST":
+        return redirect("schedule-generator")
+
+    week_type = request.POST.get('week_type')
+    force_replace = request.POST.get('force_replace') == 'yes'
+
+    today = timezone.now().date()
+    current_monday = today - timedelta(days=today.weekday())
+
+    if week_type == 'current':
+        week_start = current_monday
+        week_label = "Current Week"
+    elif week_type == 'next':
+        week_start = current_monday + timedelta(days=7)
+        week_label = "Next Week"
+    else:
+        messages.error(request, "Invalid selection.")
+        return redirect("schedule-generator")
+
+    week_end = week_start + timedelta(days=6)
+
+    # Check existing
+    existing = Schedule.objects.filter(
+        date__gte=week_start,
+        date__lte=week_end
+    ).count()
+
+    if existing > 0 and not force_replace:
+        messages.warning(
+            request,
+            f"{week_label} already has {existing} schedules! "
+            f"Tick 'Replace Existing' checkbox to regenerate."
+        )
+        return redirect("schedule-generator")
+
+    try:
+        from django.core.management import call_command
+        from io import StringIO
+        out = StringIO()
+        call_command(
+            'create_balanced_schedules',
+            week_start=str(week_start),
+            clear_existing=force_replace,
+            stdout=out
+        )
+        new_count = Schedule.objects.filter(
+            date__gte=week_start,
+            date__lte=week_end
+        ).count()
+        messages.success(
+            request,
+            f"✅ Generated {new_count} schedules for {week_label} "
+            f"({week_start} to {week_end})!"
+        )
+    except Exception as e:
+        messages.error(request, f"❌ Error: {str(e)}")
+
+    return redirect("schedule-generator")
+
+
+@login_required
+def calculate_week_profits(request):
+    """Calculate profits for a specific week"""
+    user = request.user
+
+    if not (user.is_superuser or getattr(user, "role", None) in ["admin", "zonal_admin"]):
+        messages.error(request, "Permission denied.")
+        return redirect("schedule-generator")
+
+    if request.method != "POST":
+        return redirect("schedule-generator")
+
+    # ── Parse date ────────────────────────────────────────────────
+    week_start_str = request.POST.get('week_start', '').strip()
+
+    if not week_start_str:
+        messages.error(request, "No week selected.")
+        return redirect("schedule-generator")
+
+    try:
+        week_start = date.fromisoformat(week_start_str)  # expects YYYY-MM-DD
+    except ValueError:
+        messages.error(request, f"Date error: '{week_start_str}'. Please try again.")
+        return redirect("schedule-generator")
+
+    week_end = week_start + timedelta(days=6)
+
+    # ── Check schedules exist ─────────────────────────────────────
+    if not Schedule.objects.filter(date__gte=week_start, date__lte=week_end).exists():
+        messages.warning(request, f"No schedules for {week_start_str}. Generate first!")
+        return redirect("schedule-generator")
+
+    # ── Calculate ─────────────────────────────────────────────────
+    FARE = 25
+    FUEL_PRICE = 100
+    DEFAULT_KML = 5
+
+    bus_ids = Schedule.objects.filter(
+        date__gte=week_start,
+        date__lte=week_end
+    ).values_list('bus_id', flat=True).distinct()
+
+    buses = Bus.objects.filter(id__in=bus_ids)
+    bus_profits = []
+
+    for bus in buses:
+        schedules = Schedule.objects.filter(
+            bus=bus,
+            date__gte=week_start,
+            date__lte=week_end
+        ).select_related('route')
+
+        total_trips = schedules.count()
+
+        total_passengers = sum(
+            max(s.total_seats - s.available_seats, 0)
+            for s in schedules
+        )
+
+        total_revenue = Decimal(str(total_passengers * FARE))
+
+        total_distance = Decimal('0')
+        for s in schedules:
+            try:
+                total_distance += Decimal(str(s.route.total_distance))
+            except Exception:
+                pass
+
+        try:
+            mileage = Decimal(str(bus.mileage)) if (
+                bus.mileage and float(bus.mileage) > 0
+            ) else Decimal(str(DEFAULT_KML))
+        except Exception:
+            mileage = Decimal(str(DEFAULT_KML))
+
+        fuel_cost = (total_distance / mileage) * Decimal(str(FUEL_PRICE))
+        total_profit = total_revenue - fuel_cost
+
+        WeeklyBusPerformance.objects.update_or_create(
+            bus=bus,
+            week_start_date=week_start,
+            defaults={
+                'week_end_date': week_end,
+                'total_trips': total_trips,
+                'total_passengers': total_passengers,
+                'total_distance_km': total_distance,
+                'total_revenue': total_revenue,
+                'total_fuel_cost': fuel_cost,
+                'total_profit': total_profit,
+            }
+        )
+        bus_profits.append((bus, total_profit))
+
+    # ── Rank ──────────────────────────────────────────────────────
+    bus_profits.sort(key=lambda x: x[1], reverse=True)
+    for rank, (bus, _) in enumerate(bus_profits, 1):
+        WeeklyBusPerformance.objects.filter(
+            bus=bus,
+            week_start_date=week_start
+        ).update(profit_rank=rank)
+
+    messages.success(
+        request,
+        f"✅ Profits calculated for {len(bus_profits)} buses "
+        f"({week_start_str} to {week_end.strftime('%Y-%m-%d')})!"
+    )
+    return redirect("schedule-generator")
