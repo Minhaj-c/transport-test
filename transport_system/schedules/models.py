@@ -374,36 +374,90 @@ class BusRouteAssignment(models.Model):
 
 class SpareBusSchedule(models.Model):
     """
-    Track when each bus acts as spare bus (1 hour per day).
-    Ensures coverage throughout the day.
+    Each bus has a 1-hour spare window per day.
+    e.g. Bus A: spare from 9:00 to 10:00
     """
-    bus = models.ForeignKey('schedules.Bus', on_delete=models.CASCADE)
-    date = models.DateField()
+    STATUS_CHOICES = [
+        ('waiting',    'Waiting (not started yet)'),
+        ('active',     'Active (driver clicked Spare Mode)'),
+        ('dispatched', 'Dispatched to a route'),
+        ('completed',  'Spare time ended'),
+    ]
+
+    bus            = models.ForeignKey('Bus', on_delete=models.CASCADE)
+    date           = models.DateField()
     spare_start_time = models.TimeField()
-    spare_end_time = models.TimeField()
-    
-    # Track if spare bus was used
-    was_dispatched = models.BooleanField(default=False)
-    dispatch_reason = models.TextField(null=True, blank=True)
-    
-    is_active = models.BooleanField(default=True)
-    
+    spare_end_time   = models.TimeField()
+    status         = models.CharField(max_length=20, choices=STATUS_CHOICES, default='waiting')
+
+    # When driver clicked "Enter Spare Mode"
+    activated_at   = models.DateTimeField(null=True, blank=True)
+
+    # If dispatched to a spare route
+    dispatched_to_schedule = models.ForeignKey(
+        'Schedule', null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='spare_bus_dispatched'
+    )
+    dispatched_at  = models.DateTimeField(null=True, blank=True)
+
     class Meta:
-        ordering = ['date', 'spare_start_time']
-        unique_together = ['bus', 'date']
-    
+        unique_together = ('bus', 'date')
+
     def __str__(self):
-        return f"{self.bus.number_plate} - Spare on {self.date} ({self.spare_start_time}-{self.spare_end_time})"
+        return f"{self.bus.number_plate} spare on {self.date} ({self.spare_start_time}-{self.spare_end_time})"
+
+    @property
+    def remaining_minutes(self):
+        """How many minutes left in spare window right now"""
+        now = timezone.now()
+        end_dt = timezone.datetime.combine(self.date, self.spare_end_time)
+        end_dt = timezone.make_aware(end_dt) if timezone.is_naive(end_dt) else end_dt
+        diff = (end_dt - now).total_seconds() / 60
+        return max(0, int(diff))
+
+    @property
+    def is_currently_spare(self):
+        """Is this bus currently in its spare window?"""
+        now = timezone.now()
+        today = now.date()
+        if self.date != today:
+            return False
+        current_time = now.time()
+        return self.spare_start_time <= current_time <= self.spare_end_time
 
 
-# Enhancement to existing Schedule model (add these fields if not present)
-"""
-class Schedule(models.Model):
-    # ... existing fields ...
-    
-    # Add these for profit tracking
-    passengers_boarded = models.IntegerField(default=0)
-    revenue = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    fuel_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    profit = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-"""
+class SpareDispatchRequest(models.Model):
+    """
+    When a route needs a spare bus, this record is created.
+    System picks best available spare bus and assigns it.
+    """
+    STATUS_CHOICES = [
+        ('pending',   'Pending - looking for spare bus'),
+        ('assigned',  'Spare bus assigned'),
+        ('completed', 'Spare bus completed the trip'),
+        ('failed',    'No spare bus available'),
+    ]
+
+    # The schedule that needs coverage
+    original_schedule  = models.ForeignKey(
+        'Schedule', on_delete=models.CASCADE,
+        related_name='spare_requests'
+    )
+
+    # The spare bus assigned
+    assigned_spare     = models.ForeignKey(
+        'SpareBusSchedule', null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='dispatch_requests'
+    )
+
+    status             = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    reason             = models.TextField(blank=True)  # Why spare was needed
+    created_at         = models.DateTimeField(auto_now_add=True)
+    assigned_at        = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Spare request for Schedule #{self.original_schedule.id} - {self.status}"
+
+

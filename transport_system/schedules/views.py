@@ -9,7 +9,7 @@ from rest_framework.decorators import api_view, permission_classes, authenticati
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta,datetime
 import math
 from django.views.decorators.csrf import csrf_exempt
 
@@ -17,6 +17,8 @@ from .models import Schedule, Bus
 from .serializers import ScheduleSerializer, LiveBusSerializer, BusLocationSerializer
 from routes.models import Route
 from rest_framework.authentication import SessionAuthentication
+from schedules.models import SpareBusSchedule, SpareDispatchRequest
+from django.db.models import Q
 
 
 class CsrfExemptSessionAuthentication(SessionAuthentication):
@@ -602,3 +604,394 @@ def schedule_forecast_view(request, schedule_id):
 
     forecast = compute_future_load_for_schedule(schedule)
     return Response(forecast, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@authentication_classes([CsrfExemptSessionAuthentication])
+def enter_spare_mode(request):
+    """
+    Driver clicks "Enter Spare Mode" button.
+    POST /api/schedules/spare/enter/
+    """
+    user = request.user
+    today = timezone.now().date()
+    now = timezone.now()
+
+    # Find driver's bus from today's schedule
+    today_schedule = Schedule.objects.filter(
+        driver=user,
+        date=today
+    ).select_related('bus').first()
+
+    if not today_schedule:
+        return Response(
+            {'error': 'No bus assigned to you today.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    bus = today_schedule.bus
+
+    # Find spare schedule
+    spare = SpareBusSchedule.objects.filter(bus=bus, date=today).first()
+
+    if not spare:
+        return Response(
+            {'error': 'No spare schedule found for your bus today.'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Check time window (allow 10 min early)
+    current_time = now.time()
+    window_start = (datetime.combine(today, spare.spare_start_time) - timedelta(minutes=10)).time()
+    
+    if current_time < window_start:
+        return Response(
+            {'error': f'Spare window starts at {spare.spare_start_time}. You can enter 10 minutes before.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    if current_time > spare.spare_end_time:
+        return Response(
+            {'error': 'Your spare window has ended.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Activate
+    spare.status = 'active'
+    spare.activated_at = now
+    spare.save()
+
+    return Response({
+        'success': True,
+        'message': f'Spare mode activated! You are spare until {spare.spare_end_time}',
+        'spare_id': spare.id,
+        'spare_end_time': str(spare.spare_end_time),
+        'remaining_minutes': spare.remaining_minutes,
+    })
+
+
+@api_view(['GET'])
+@authentication_classes([CsrfExemptSessionAuthentication])
+def get_spare_status(request):
+    """
+    Get spare status for driver.
+    GET /api/schedules/spare/status/
+    """
+    user = request.user
+    today = timezone.now().date()
+
+    # Check authentication
+    if not user.is_authenticated:
+        return Response({
+            'has_spare': False, 
+            'message': 'Not logged in'
+        })
+
+    # Find driver's bus from today's schedule
+    today_schedule = Schedule.objects.filter(
+        driver=user,
+        date=today
+    ).select_related('bus').first()
+
+    if not today_schedule:
+        return Response({
+            'has_spare': False, 
+            'message': 'No schedule today'
+        })
+
+    # Find spare schedule for this bus
+    spare = SpareBusSchedule.objects.filter(
+        bus=today_schedule.bus,
+        date=today
+    ).first()
+
+    if not spare:
+        return Response({'has_spare': False})
+
+    # Return spare info
+    return Response({
+        'has_spare': True,
+        'spare_id': spare.id,
+        'spare_start': str(spare.spare_start_time),
+        'spare_end': str(spare.spare_end_time),
+        'status': spare.status,
+        'remaining_minutes': spare.remaining_minutes,
+        'is_active': spare.status == 'active',
+        'is_dispatched': spare.status == 'dispatched',
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@authentication_classes([CsrfExemptSessionAuthentication])
+def request_spare_bus(request):
+    """
+    Request spare bus for a schedule.
+    POST /api/schedules/spare/request/
+    Body: {"schedule_id": 12, "reason": "Bus breakdown"}
+    
+    FIXED: Only shows buses that are ACTIVE in spare mode
+    """
+    schedule_id = request.data.get('schedule_id')
+    reason = request.data.get('reason', 'Spare bus requested')
+
+    if not schedule_id:
+        return Response({'error': 'schedule_id required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        original_schedule = Schedule.objects.select_related('route', 'bus', 'driver').get(id=schedule_id)
+    except Schedule.DoesNotExist:
+        return Response({'error': 'Schedule not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    today = timezone.now().date()
+    now = timezone.now()
+
+    # 🔥 FIX: Find ONLY buses in ACTIVE spare mode (driver clicked Enter Spare Mode)
+    available_spares = SpareBusSchedule.objects.filter(
+        date=today,
+        status='active',  # Must be active (driver clicked button)
+        spare_end_time__gt=now.time()  # Still within window
+    ).select_related('bus').order_by('spare_end_time')
+
+    if not available_spares.exists():
+        SpareDispatchRequest.objects.create(
+            original_schedule=original_schedule,
+            status='failed',
+            reason=f'{reason} - No spare buses available'
+        )
+        return Response(
+            {'error': 'No spare buses available. Drivers must click "Enter Spare Mode" first.'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Pick best (most remaining time)
+    best_spare = None
+    best_remaining = -1
+    for spare in available_spares:
+        remaining = spare.remaining_minutes
+        if remaining > best_remaining:
+            best_remaining = remaining
+            best_spare = spare
+
+    if best_spare is None or best_remaining < 10:
+        return Response(
+            {'error': 'No spare bus has enough time (min 10 minutes needed).'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # 🔥 FIX: Use bus's assigned driver (don't ask for driver)
+    # First try to get driver from spare bus
+    spare_driver = None
+    
+    # Option 1: Check if bus has assigned_driver field
+    if hasattr(best_spare.bus, 'assigned_driver') and best_spare.bus.assigned_driver:
+        spare_driver = best_spare.bus.assigned_driver
+    
+    # Option 2: Find driver from today's schedules for this bus
+    if not spare_driver:
+        today_schedule = Schedule.objects.filter(
+            bus=best_spare.bus,
+            date=today
+        ).select_related('driver').first()
+        
+        if today_schedule:
+            spare_driver = today_schedule.driver
+    
+    # Option 3: Use original schedule's driver as fallback
+    if not spare_driver:
+        spare_driver = original_schedule.driver
+
+    # Create spare schedule
+    spare_schedule = Schedule.objects.create(
+        bus=best_spare.bus,
+        route=original_schedule.route,
+        driver=spare_driver,  # Use found driver
+        date=today,
+        departure_time=original_schedule.departure_time,
+        arrival_time=original_schedule.arrival_time,
+        total_seats=best_spare.bus.capacity,
+        available_seats=best_spare.bus.capacity,
+        is_spare_trip=True,
+    )
+
+    # Update spare status
+    best_spare.status = 'dispatched'
+    best_spare.dispatched_to_schedule = spare_schedule
+    best_spare.dispatched_at = now
+    best_spare.save()
+
+    # Create dispatch record
+    SpareDispatchRequest.objects.create(
+        original_schedule=original_schedule,
+        assigned_spare=best_spare,
+        status='assigned',
+        reason=reason,
+        assigned_at=now,
+    )
+
+    return Response({
+        'success': True,
+        'message': f'Spare bus {best_spare.bus.number_plate} assigned!',
+        'spare_bus': best_spare.bus.number_plate,
+        'driver': spare_driver.get_full_name() if spare_driver else 'Unknown',
+        'remaining_minutes': best_remaining,
+        'spare_schedule_id': spare_schedule.id,
+        'route': original_schedule.route.number,
+        'departure_time': str(original_schedule.departure_time),
+    })
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@authentication_classes([CsrfExemptSessionAuthentication])
+def report_delayed_arrival(request):
+    """
+    Driver reports late arrival.
+    POST /api/schedules/spare/delayed/
+    Body: {"schedule_id": 15, "estimated_arrival": "10:15"}
+    """
+    user = request.user
+    schedule_id = request.data.get('schedule_id')
+    estimated_arrival = request.data.get('estimated_arrival')
+
+    if not schedule_id or not estimated_arrival:
+        return Response(
+            {'error': 'schedule_id and estimated_arrival required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        missed_schedule = Schedule.objects.select_related('route', 'bus').get(id=schedule_id)
+    except Schedule.DoesNotExist:
+        return Response({'error': 'Schedule not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    today = timezone.now().date()
+
+    # Parse time
+    try:
+        arrival_time = datetime.strptime(estimated_arrival, '%H:%M').time()
+    except ValueError:
+        return Response(
+            {'error': 'Invalid time format. Use HH:MM'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Check if late
+    if arrival_time <= missed_schedule.departure_time:
+        return Response({
+            'message': 'You will arrive on time!',
+            'can_make_it': True,
+        })
+
+    # Find spare bus
+    now = timezone.now()
+    available_spares = SpareBusSchedule.objects.filter(
+        date=today,
+        status='active',
+        spare_end_time__gte=missed_schedule.departure_time,
+    ).select_related('bus')
+
+    if not available_spares.exists():
+        return Response({
+            'success': False,
+            'message': 'You will be late but no spare buses available.',
+            'can_make_it': False,
+        })
+
+    # Pick best
+    best_spare = None
+    best_remaining = -1
+    for spare in available_spares:
+        remaining = spare.remaining_minutes
+        if remaining > best_remaining:
+            best_remaining = remaining
+            best_spare = spare
+
+    if best_spare is None:
+        return Response({'success': False, 'message': 'No suitable spare found.', 'can_make_it': False})
+
+    # Create spare schedule
+    spare_schedule = Schedule.objects.create(
+        bus=best_spare.bus,
+        route=missed_schedule.route,
+        driver=best_spare.bus.assigned_driver or missed_schedule.driver,
+        date=today,
+        departure_time=missed_schedule.departure_time,
+        arrival_time=missed_schedule.arrival_time,
+        total_seats=best_spare.bus.capacity,
+        available_seats=best_spare.bus.capacity,
+        is_spare_trip=True,
+    )
+
+    best_spare.status = 'dispatched'
+    best_spare.dispatched_to_schedule = spare_schedule
+    best_spare.dispatched_at = now
+    best_spare.save()
+
+    SpareDispatchRequest.objects.create(
+        original_schedule=missed_schedule,
+        assigned_spare=best_spare,
+        status='assigned',
+        reason=f'Driver delayed - arrival {estimated_arrival}',
+        assigned_at=now,
+    )
+
+    return Response({
+        'success': True,
+        'message': f'Spare bus {best_spare.bus.number_plate} will cover your trip.',
+        'can_make_it': False,
+        'spare_bus_assigned': best_spare.bus.number_plate,
+    })
+
+@api_view(['POST'])
+@authentication_classes([CsrfExemptSessionAuthentication])
+def exit_spare_mode(request):
+    """
+    Driver exits spare mode.
+    POST /api/schedules/spare/exit/
+    """
+    user = request.user
+    
+    if not user.is_authenticated:
+        return Response(
+            {'error': 'Authentication required'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
+    
+    today = timezone.now().date()
+
+    # Find driver's bus
+    today_schedule = Schedule.objects.filter(
+        driver=user,
+        date=today
+    ).select_related('bus').first()
+
+    if not today_schedule:
+        return Response(
+            {'error': 'No bus assigned to you today.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    bus = today_schedule.bus
+
+    # Find spare schedule
+    spare = SpareBusSchedule.objects.filter(
+        bus=bus,
+        date=today,
+        status='active'
+    ).first()
+
+    if not spare:
+        return Response(
+            {'error': 'You are not in spare mode.'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # Deactivate
+    spare.status = 'completed'
+    spare.save()
+
+    return Response({
+        'success': True,
+        'message': 'Spare mode deactivated',
+    })

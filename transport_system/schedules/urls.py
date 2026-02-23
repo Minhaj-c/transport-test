@@ -17,7 +17,11 @@ urlpatterns = [
     path('api/buses/<int:bus_id>/', views.bus_details, name='bus-details'),
     path('api/schedules/passenger-count/', views.update_passenger_count, name='update-passenger-count'),
     path( 'api/schedules/current-stop/',views.update_current_stop,name='update-current-stop'),
-    path('api/schedules/<int:schedule_id>/forecast/',views.schedule_forecast_view,name='schedule-forecast',
-    ),
+    path('api/schedules/<int:schedule_id>/forecast/',views.schedule_forecast_view,name='schedule-forecast'),
+    path('api/schedules/spare/enter/', views.enter_spare_mode, name='spare-enter'),
+    path('api/schedules/spare/status/', views.get_spare_status, name='spare-status'),
+    path('api/schedules/spare/request/', views.request_spare_bus, name='spare-request'),
+    path('api/schedules/spare/delayed/', views.report_delayed_arrival, name='spare-delayed'),
+    path('api/schedules/spare/exit/', views.exit_spare_mode, name='spare-exit'),
     
 ]

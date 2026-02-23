@@ -181,7 +181,6 @@ class ApiService {
 
       if (response.statusCode == 201) {
         final decoded = json.decode(response.body) as Map<String, dynamic>;
-        // your backend wraps it as {success, message, data}
         if (decoded['data'] is Map<String, dynamic>) {
           return decoded['data'] as Map<String, dynamic>;
         }
@@ -189,7 +188,6 @@ class ApiService {
       } else if (response.statusCode == 401) {
         throw Exception('Authentication required');
       } else {
-        // ... your existing error parsing stays the same
         try {
           final decoded = json.decode(response.body);
           if (decoded is Map<String, dynamic>) {
@@ -211,12 +209,10 @@ class ApiService {
               throw Exception(parts.join(' | '));
             }
           }
-          throw Exception(
-              'Failed to create pre-inform (${response.statusCode})');
+          throw Exception('Failed to create pre-inform (${response.statusCode})');
         } catch (inner) {
           print('Error parsing pre-inform error body: $inner');
-          throw Exception(
-              'Failed to create pre-inform (${response.statusCode})');
+          throw Exception('Failed to create pre-inform (${response.statusCode})');
         }
       }
     } catch (e) {
@@ -311,7 +307,7 @@ class ApiService {
   }
 
   // -----------------------------
-  // 🔥 PASSENGER COUNT UPDATE - ENHANCED DEBUG VERSION
+  // Passenger Count Update
   // -----------------------------
   static Future<Map<String, dynamic>> updatePassengerCount({
     required int scheduleId,
@@ -378,13 +374,9 @@ class ApiService {
             print('═══════════════════════════════════════════════════════════');
             throw Exception(decoded['detail']);
           }
-        } catch (_) {
-          // ignore parse error
-        }
+        } catch (_) {}
         print('═══════════════════════════════════════════════════════════');
-        throw Exception(
-          'Failed to update passenger count (${response.statusCode})',
-        );
+        throw Exception('Failed to update passenger count (${response.statusCode})');
       }
     } catch (e, stackTrace) {
       print('💥 EXCEPTION in updatePassengerCount:');
@@ -397,46 +389,42 @@ class ApiService {
   }
 
   // -----------------------------
-// 🔥 NEW: Update current stop (Driver)
-// -----------------------------
-static Future<Map<String, dynamic>> updateCurrentStop({
-  required int scheduleId,
-  required int stopSequence,
-}) async {
-  print('🚏 updateCurrentStop CALLED');
-  print('   scheduleId: $scheduleId');
-  print('   stopSequence: $stopSequence');
-  print('   URL: ${ApiConfig.updateCurrentStop}');
-  print('   Headers: $_headers');
+  // Update Current Stop (Driver)
+  // -----------------------------
+  static Future<Map<String, dynamic>> updateCurrentStop({
+    required int scheduleId,
+    required int stopSequence,
+  }) async {
+    print('🚏 updateCurrentStop CALLED');
+    print('   scheduleId: $scheduleId');
+    print('   stopSequence: $stopSequence');
+    print('   URL: ${ApiConfig.updateCurrentStop}');
+    print('   Headers: $_headers');
 
-  final body = json.encode({
-    'schedule_id': scheduleId,
-    'stop_sequence': stopSequence,
-  });
+    final body = json.encode({
+      'schedule_id': scheduleId,
+      'stop_sequence': stopSequence,
+    });
 
-  final response = await http.post(
-    Uri.parse(ApiConfig.updateCurrentStop),
-    headers: _headers,
-    body: body,
-  );
-
-  print('🚏 updateCurrentStop status: ${response.statusCode}');
-  print('🚏 updateCurrentStop body: ${response.body}');
-
-  if (response.statusCode == 200) {
-    return json.decode(response.body) as Map<String, dynamic>;
-  } else if (response.statusCode == 401) {
-    throw Exception('Authentication required');
-  } else if (response.statusCode == 403) {
-    throw Exception('Only the assigned driver can update current stop');
-  } else {
-    throw Exception(
-      'Failed to update current stop (${response.statusCode})',
+    final response = await http.post(
+      Uri.parse(ApiConfig.updateCurrentStop),
+      headers: _headers,
+      body: body,
     );
+
+    print('🚏 updateCurrentStop status: ${response.statusCode}');
+    print('🚏 updateCurrentStop body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body) as Map<String, dynamic>;
+    } else if (response.statusCode == 401) {
+      throw Exception('Authentication required');
+    } else if (response.statusCode == 403) {
+      throw Exception('Only the assigned driver can update current stop');
+    } else {
+      throw Exception('Failed to update current stop (${response.statusCode})');
+    }
   }
-}
-
-
 
   // -----------------------------
   // Passenger Live Status
@@ -444,7 +432,7 @@ static Future<Map<String, dynamic>> updateCurrentStop({
   static Future<Map<String, dynamic>> getLiveStatusForStop({
     required int routeId,
     required int stopId,
-    String? date, // yyyy-MM-dd
+    String? date,
   }) async {
     try {
       var url = ApiConfig.routeLiveStatus(routeId);
@@ -475,9 +463,7 @@ static Future<Map<String, dynamic>> updateCurrentStop({
       } else if (response.statusCode == 401) {
         throw Exception('Authentication required');
       } else {
-        throw Exception(
-          'Failed to load live status (${response.statusCode})',
-        );
+        throw Exception('Failed to load live status (${response.statusCode})');
       }
     } catch (e) {
       print('❌ Error getting live status: $e');
@@ -485,6 +471,115 @@ static Future<Map<String, dynamic>> updateCurrentStop({
     }
   }
 
+  // -----------------------------
+  // 🔥 SPARE BUS APIs
+  // -----------------------------
 
+  /// Driver clicks "Enter Spare Mode" button
+  static Future<Map<String, dynamic>> enterSpareMode() async {
+    try {
+      print('🔥 Calling enterSpareMode API...');
+      
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/api/schedules/spare/enter/'),
+        headers: _headers,
+      );
 
+      print('Enter spare mode response: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body) as Map<String, dynamic>;
+      } else {
+        final decoded = json.decode(response.body);
+        throw Exception(decoded['error'] ?? 'Failed to enter spare mode');
+      }
+    } catch (e) {
+      print('❌ Error entering spare mode: $e');
+      rethrow;
+    }
+  }
+
+  /// Get spare status for today
+  static Future<Map<String, dynamic>> getSpareStatus() async {
+    try {
+      print('🔍 Checking spare status...');
+      
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/api/schedules/spare/status/'),
+        headers: _headers,
+      );
+
+      print('Spare status response: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body) as Map<String, dynamic>;
+      }
+      
+      return {'has_spare': false};
+    } catch (e) {
+      print('❌ Error getting spare status: $e');
+      return {'has_spare': false};
+    }
+  }
+
+  /// Driver reports they will arrive late from spare duty
+  static Future<Map<String, dynamic>> reportDelayedArrival({
+    required int scheduleId,
+    required String estimatedArrival, // "HH:MM"
+  }) async {
+    try {
+      print('⏰ Reporting delayed arrival...');
+      print('   scheduleId: $scheduleId');
+      print('   estimatedArrival: $estimatedArrival');
+      
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/api/schedules/spare/delayed/'),
+        headers: _headers,
+        body: json.encode({
+          'schedule_id': scheduleId,
+          'estimated_arrival': estimatedArrival,
+        }),
+      );
+
+      print('Report delay response: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body) as Map<String, dynamic>;
+      } else {
+        final decoded = json.decode(response.body);
+        throw Exception(decoded['error'] ?? 'Failed to report delay');
+      }
+    } catch (e) {
+      print('❌ Error reporting delay: $e');
+      rethrow;
+    }
+  }
+
+  /// Driver exits spare mode
+  static Future<Map<String, dynamic>> exitSpareMode() async {
+    try {
+      print('🚪 Exiting spare mode...');
+      
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/api/schedules/spare/exit/'),
+        headers: _headers,
+      );
+
+      print('Exit spare mode response: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body) as Map<String, dynamic>;
+      } else {
+        final decoded = json.decode(response.body);
+        throw Exception(decoded['error'] ?? 'Failed to exit spare mode');
+      }
+    } catch (e) {
+      print('❌ Error exiting spare mode: $e');
+      rethrow;
+    }
+  }
 }
