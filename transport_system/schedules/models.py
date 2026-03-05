@@ -189,6 +189,17 @@ class Schedule(models.Model):
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ('scheduled', 'Scheduled'),
+            ('running', 'Running'),
+            ('completed', 'Completed'),
+            ('covered_by_spare', 'Covered by Spare'),  # 🔥 NEW
+            ('cancelled', 'Cancelled'),
+        ],
+        default='scheduled'
+    )
 
     class Meta:
         verbose_name = 'Schedule'
@@ -244,6 +255,7 @@ class Schedule(models.Model):
                 "available_seats",
             ]
         )
+        
 
 class BusSchedule(models.Model):
     """

@@ -582,4 +582,33 @@ class ApiService {
       rethrow;
     }
   }
+
+  static Future<Map<String, dynamic>> completeSpareTripAndCheckHandoff({
+    required int scheduleId,
+  }) async {
+    try {
+      print('✅ Completing spare trip and checking handoff...');
+      
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/api/schedules/spare/complete/'),
+        headers: _headers,
+        body: json.encode({
+          'schedule_id': scheduleId,
+        }),
+      );
+
+      print('Complete spare trip response: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body) as Map<String, dynamic>;
+      } else {
+        final decoded = json.decode(response.body);
+        throw Exception(decoded['error'] ?? 'Failed to complete spare trip');
+      }
+    } catch (e) {
+      print('❌ Error completing spare trip: $e');
+      rethrow;
+    }
+  }
 }

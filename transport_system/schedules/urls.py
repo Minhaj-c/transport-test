@@ -23,5 +23,6 @@ urlpatterns = [
     path('api/schedules/spare/request/', views.request_spare_bus, name='spare-request'),
     path('api/schedules/spare/delayed/', views.report_delayed_arrival, name='spare-delayed'),
     path('api/schedules/spare/exit/', views.exit_spare_mode, name='spare-exit'),
+    path('api/schedules/spare/complete/', views.complete_spare_trip, name='spare-complete'),
     
 ]

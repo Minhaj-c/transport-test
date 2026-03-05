@@ -127,7 +127,7 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
           content: Row(
             children: [
               const Icon(Icons.error, color: Colors.white),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(child: Text('Error: ${e.toString()}')),
             ],
           ),
@@ -169,26 +169,110 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
     });
   }
 
-  void _stopBus() {
-    if (!mounted) return;
+  // 🔥 UPDATED: Handle completing trips with cascade handoff check
+  Future<void> _stopBus() async {
+    if (!mounted || _activeSchedule == null) return;
 
+    final completedSchedule = _activeSchedule;
+
+    // Check for handoff if this was a spare trip
+    if (completedSchedule!.isSpareTrip) {
+      try {
+        final result = await ApiService.completeSpareTripAndCheckHandoff(
+          scheduleId: completedSchedule.id,
+        );
+
+        if (!mounted) return;
+
+        if (result['has_handoff'] == true) {
+          // Show handoff notification
+          final handoff = result['handoff_schedule'];
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '🔄 Handoff Assignment!',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Route ${handoff['route_number']} at ${handoff['departure_time']}',
+                    style: const TextStyle(fontSize: 14, color: Colors.white),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Check your schedule for details',
+                    style: TextStyle(fontSize: 12, color: Colors.white70),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.orange[700],
+              duration: const Duration(seconds: 6),
+              action: SnackBarAction(
+                label: 'View',
+                textColor: Colors.white,
+                onPressed: () {
+                  _loadSchedules();
+                },
+              ),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✅ ${result['message']}'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        print('Error checking handoff: $e');
+        // Continue with normal stop
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.stop_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Text('Bus stopped'),
+              ],
+            ),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } else {
+      // Normal trip completion
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.stop_circle, color: Colors.white),
+              SizedBox(width: 12),
+              Text('Bus stopped'),
+            ],
+          ),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+
+    // Stop tracking
     setState(() {
       _isRunning = false;
       _activeSchedule = null;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.stop_circle, color: Colors.white),
-            SizedBox(width: 12),
-            Text('Bus stopped'),
-          ],
-        ),
-        backgroundColor: Colors.orange,
-      ),
-    );
+    // Reload schedules
+    await _loadSchedules();
   }
 
   void _showCurrentStopPicker(Schedule schedule) {
@@ -280,8 +364,8 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
     );
   }
 
-  // 🔥 NEW: Report delayed arrival
-  Future<void> _reportDelayedArrival(Schedule nextSchedule) async {
+  // 🔥 NEW: Report delayed arrival with cascade assignment
+  Future<void> _reportDelayedArrival(Schedule schedule) async {
     final TimeOfDay? picked = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.now(),
@@ -295,7 +379,7 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
 
     try {
       final result = await ApiService.reportDelayedArrival(
-        scheduleId: nextSchedule.id,
+        scheduleId: schedule.id,
         estimatedArrival: estimatedTime,
       );
 
@@ -308,15 +392,13 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
             backgroundColor: Colors.green,
           ),
         );
-      } else if (result['success'] == true) {
+      } else if (result['success'] == true && result['spare_bus_assigned'] == true) {
+        // Show cascade assignment notification
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              '⚡ Spare bus ${result['spare_bus_assigned']} will cover your '
-              '${result['schedule_departure']} trip.',
-            ),
+            content: Text(result['message'] ?? 'Spare bus assigned'),
             backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 5),
+            duration: const Duration(seconds: 6),
           ),
         );
         await _loadSchedules(); // Reload to see changes
@@ -383,6 +465,7 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
               schedule: _activeSchedule!,
               onStop: _stopBus,
               onUpdateCurrentStop: () => _showCurrentStopPicker(_activeSchedule!),
+              onReportDelay: () => _reportDelayedArrival(_activeSchedule!),
             ),
           Expanded(
             child: _schedules.isEmpty
@@ -422,23 +505,12 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
                           schedule.date.month == now.month &&
                           schedule.date.day == now.day;
 
-                      // 🔥 Check if this is the next schedule after active one
-                      final isNextAfterSpare = _isRunning &&
-                          _activeSchedule != null &&
-                          _activeSchedule!.isSpareTrip &&
-                          !isActive &&
-                          isToday &&
-                          index > 0 &&
-                          _schedules[index - 1].id == _activeSchedule!.id;
-
                       return _ScheduleCard(
                         schedule: schedule,
                         isActive: isActive,
                         isToday: isToday,
                         onStart: () => _startBus(schedule),
                         isStarting: _isStarting,
-                        showDelayButton: isNextAfterSpare,
-                        onReportDelay: () => _reportDelayedArrival(schedule),
                       );
                     },
                   ),
@@ -459,11 +531,13 @@ class _ActiveScheduleCard extends StatelessWidget {
   final Schedule schedule;
   final VoidCallback onStop;
   final VoidCallback onUpdateCurrentStop;
+  final VoidCallback onReportDelay;
 
   const _ActiveScheduleCard({
     required this.schedule,
     required this.onStop,
     required this.onUpdateCurrentStop,
+    required this.onReportDelay,
   });
 
   @override
@@ -586,6 +660,29 @@ class _ActiveScheduleCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
+          
+          // 🔥 NEW: Report delay button (only for spare trips)
+          if (schedule.isSpareTrip)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onReportDelay,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white70, width: 2),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                icon: const Icon(Icons.warning_amber, size: 18),
+                label: const Text(
+                  'I will arrive late for next trip',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          
+          if (schedule.isSpareTrip)
+            const SizedBox(height: 8),
+          
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
@@ -614,8 +711,6 @@ class _ScheduleCard extends StatelessWidget {
   final bool isToday;
   final VoidCallback onStart;
   final bool isStarting;
-  final bool showDelayButton;
-  final VoidCallback onReportDelay;
 
   const _ScheduleCard({
     required this.schedule,
@@ -623,8 +718,6 @@ class _ScheduleCard extends StatelessWidget {
     required this.isToday,
     required this.onStart,
     required this.isStarting,
-    this.showDelayButton = false,
-    required this.onReportDelay,
   });
 
   @override
@@ -746,7 +839,7 @@ class _ScheduleCard extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // 🔥 Start button
+            // Start button
             if (isToday && !isActive)
               SizedBox(
                 width: double.infinity,
@@ -770,23 +863,6 @@ class _ScheduleCard extends StatelessWidget {
                         )
                       : const Icon(Icons.play_arrow),
                   label: Text(isStarting ? 'Starting...' : 'Start Bus'),
-                ),
-              ),
-
-            // 🔥 NEW: Delay report button
-            if (showDelayButton)
-              Container(
-                margin: const EdgeInsets.only(top: 8),
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: onReportDelay,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.orange[700],
-                    side: BorderSide(color: Colors.orange.shade400),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  icon: Icon(Icons.warning_amber, color: Colors.orange[700], size: 18),
-                  label: const Text('I will arrive late for this trip'),
                 ),
               ),
           ],
