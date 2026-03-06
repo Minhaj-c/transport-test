@@ -12,6 +12,9 @@ class PreInform(models.Model):
     """
     Passengers can submit travel plans in advance.
     Now supports BOTH boarding and drop-off stops.
+    
+    🔥 AUTO-ACCEPTANCE: Default status is 'noted' for scalability
+    No admin approval needed - system handles 1000+ pre-informs automatically
     """
 
     user = models.ForeignKey(
@@ -43,7 +46,7 @@ class PreInform(models.Model):
         help_text="Stop where passenger will board",
     )
 
-    # 🔥 NEW: Drop-off location
+    # 🔥 Drop-off location
     dropoff_stop = models.ForeignKey(
         Stop,
         on_delete=models.CASCADE,
@@ -59,15 +62,16 @@ class PreInform(models.Model):
     )
 
     STATUS_CHOICES = (
-        ('pending', 'Pending'),
-        ('noted', 'Noted by Controller'),
+        ('noted', 'Noted'),           # ✅ Auto-accepted (default)
         ('completed', 'Journey Completed'),
         ('cancelled', 'Cancelled'),
     )
+    
+    # 🔥 CHANGED: Default is 'noted' (auto-accepted) instead of 'pending'
     status = models.CharField(
         max_length=20,
         choices=STATUS_CHOICES,
-        default='pending',
+        default='noted',  # ← Auto-acceptance for scalability!
         help_text="Current status of pre-inform",
     )
 
@@ -97,5 +101,5 @@ class PreInform(models.Model):
         from django.utils import timezone
         return (
             self.date_of_travel >= timezone.now().date()
-            and self.status == 'pending'
+            and self.status == 'noted'  # ← Changed from 'pending'
         )

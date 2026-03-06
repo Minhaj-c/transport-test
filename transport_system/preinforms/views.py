@@ -10,6 +10,8 @@ from rest_framework.authentication import SessionAuthentication
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from django.utils import timezone
+from datetime import timedelta
 
 from .models import PreInform
 from .serializers import PreInformSerializer, PreInformCreateSerializer
@@ -32,12 +34,15 @@ class PreInformCreateView(generics.CreateAPIView):
     """
     API endpoint for users to submit pre-informs
     
+    🔥 AUTO-ACCEPTANCE with smart validation for scalability
+    
     POST /api/preinforms/
     {
         "route": 1,
         "date_of_travel": "2024-12-25",
         "desired_time": "09:00",
         "boarding_stop": 5,
+        "dropoff_stop": 12,
         "passenger_count": 2
     }
     """
@@ -47,10 +52,106 @@ class PreInformCreateView(generics.CreateAPIView):
     authentication_classes = (CsrfExemptSessionAuthentication,)
 
     def perform_create(self, serializer):
-        """Set the user to currently logged-in user"""
+        """
+        Set the user to currently logged-in user
+        Status defaults to 'noted' (auto-accepted) in model
+        """
         serializer.save(user=self.request.user)
     
     def create(self, request, *args, **kwargs):
+        """
+        Create pre-inform with smart validation
+        
+        🔥 VALIDATIONS (prevent abuse):
+        - Max 10 passengers per pre-inform
+        - Future dates only
+        - Rate limiting: 10 per hour
+        - Valid stop sequence (dropoff after boarding)
+        """
+        
+        # 🔥 VALIDATION 1: Reasonable passenger count
+        passenger_count = request.data.get('passenger_count', 1)
+        try:
+            passenger_count = int(passenger_count)
+            if passenger_count > 10:
+                return Response(
+                    {
+                        'success': False,
+                        'error': 'Maximum 10 passengers per pre-inform'
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if passenger_count < 1:
+                return Response(
+                    {
+                        'success': False,
+                        'error': 'Minimum 1 passenger required'
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except (ValueError, TypeError):
+            return Response(
+                {
+                    'success': False,
+                    'error': 'Invalid passenger count'
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 🔥 VALIDATION 2: Future date only
+        from datetime import date
+        date_of_travel = request.data.get('date_of_travel')
+        if date_of_travel:
+            try:
+                travel_date = date.fromisoformat(str(date_of_travel))
+                if travel_date < date.today():
+                    return Response(
+                        {
+                            'success': False,
+                            'error': 'Cannot pre-inform for past dates'
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            except (ValueError, TypeError):
+                pass  # Let serializer handle invalid date format
+        
+        # 🔥 VALIDATION 3: Rate limiting (prevent spam)
+        recent_count = PreInform.objects.filter(
+            user=request.user,
+            created_at__gte=timezone.now() - timedelta(hours=1)
+        ).count()
+        
+        if recent_count >= 10:
+            return Response(
+                {
+                    'success': False,
+                    'error': 'Maximum 10 pre-informs per hour. Please try again later.'
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+        
+        # 🔥 VALIDATION 4: Check stop sequence (if both stops provided)
+        from routes.models import Stop
+        boarding_stop_id = request.data.get('boarding_stop')
+        dropoff_stop_id = request.data.get('dropoff_stop')
+        
+        if boarding_stop_id and dropoff_stop_id:
+            try:
+                boarding_stop = Stop.objects.get(id=boarding_stop_id)
+                dropoff_stop = Stop.objects.get(id=dropoff_stop_id)
+                
+                if dropoff_stop.sequence <= boarding_stop.sequence:
+                    return Response(
+                        {
+                            'success': False,
+                            'error': 'Drop-off stop must be after boarding stop on the route'
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            except Stop.DoesNotExist:
+                pass  # Let serializer handle invalid stop IDs
+        
+        # All validations passed - create pre-inform
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
@@ -61,7 +162,8 @@ class PreInformCreateView(generics.CreateAPIView):
         return Response(
             {
                 'success': True,
-                'message': 'Pre-inform submitted successfully',
+                'message': '✅ Pre-inform submitted and accepted automatically!',
+                'info': 'Your travel plan has been noted. Buses will be assigned based on demand.',
                 'data': output_serializer.data
             },
             status=status.HTTP_201_CREATED
@@ -84,7 +186,7 @@ class PreInformListView(generics.ListAPIView):
     
     def get_queryset(self):
         queryset = PreInform.objects.all().select_related(
-            'user', 'route', 'boarding_stop'
+            'user', 'route', 'boarding_stop', 'dropoff_stop'
         )
         
         # Admin can see all, users see only their own
@@ -119,7 +221,7 @@ def my_preinforms_view(request):
     """
     preinforms = PreInform.objects.filter(
         user=request.user
-    ).select_related('route', 'boarding_stop').order_by('-created_at')
+    ).select_related('route', 'boarding_stop', 'dropoff_stop').order_by('-created_at')
     
     serializer = PreInformSerializer(preinforms, many=True)
     return Response(serializer.data)
@@ -133,14 +235,16 @@ def cancel_preinform_view(request, preinform_id):
     Cancel a pre-inform
     
     DELETE /api/preinforms/<id>/cancel/
+    
+    🔥 UPDATED: Can cancel 'noted' pre-informs (not just 'pending')
     """
     try:
         preinform = PreInform.objects.get(id=preinform_id, user=request.user)
         
-        # Only allow cancellation if status is pending
-        if preinform.status != 'pending':
+        # Allow cancellation if status is 'noted' (not completed/cancelled)
+        if preinform.status in ['completed', 'cancelled']:
             return Response(
-                {'error': 'Can only cancel pending pre-informs'},
+                {'error': f'Cannot cancel {preinform.status} pre-informs'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
