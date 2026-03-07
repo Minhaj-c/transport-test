@@ -2,113 +2,343 @@
 <html>
 <head>
     <title>Schedules</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        body { font-family:Arial, sans-serif; margin:0; background:#eef1f7; }
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+            font-family: 'IBM Plex Sans', sans-serif;
+            margin: 0;
+            background: #0d1117;
+            color: #e6edf3;
+            min-height: 100vh;
+        }
+
+        /* ── Header ── */
         .header {
-            background:#004aad; padding:18px 30px; color:white;
-            display:flex; justify-content:space-between; align-items:center;
-            box-shadow:0 2px 5px rgba(0,0,0,0.2);
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-        .header h2 { margin:0; }
-        .header a {
-            color:#dbe7ff; text-decoration:none; margin-left:16px; font-size:14px;
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .header-logo {
+            width: 32px; height: 32px;
+            background: #1f6feb;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px;
         }
-        .header a:hover { text-decoration:underline; }
+        .header h2 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: #e6edf3;
+            letter-spacing: 0.01em;
+        }
+        .header-nav { display: flex; gap: 4px; }
+        .header-nav a {
+            color: #8b949e;
+            text-decoration: none;
+            font-size: 13px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            transition: background 0.15s, color 0.15s;
+        }
+        .header-nav a:hover { background: #21262d; color: #e6edf3; }
 
-        .container { width:90%; margin:25px auto 40px; }
+        /* ── Date Navigator ── */
+        .date-nav-wrapper {
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+            padding: 14px 32px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .date-nav-btn {
+            background: #21262d;
+            border: 1px solid #30363d;
+            color: #e6edf3;
+            padding: 7px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: 'IBM Plex Sans', sans-serif;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .date-nav-btn:hover { background: #30363d; border-color: #8b949e; }
+        .date-nav-btn:active { background: #3d444e; }
+
+        .date-label {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 14px;
+            font-weight: 600;
+            color: #e6edf3;
+            background: #21262d;
+            border: 1px solid #30363d;
+            padding: 7px 16px;
+            border-radius: 6px;
+            min-width: 160px;
+            text-align: center;
+        }
+        .date-label.is-today { border-color: #1f6feb; color: #79c0ff; }
+
+        .date-today-btn {
+            background: transparent;
+            border: 1px solid #1f6feb;
+            color: #79c0ff;
+            padding: 7px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: 'IBM Plex Sans', sans-serif;
+            cursor: pointer;
+            transition: background 0.15s;
+            font-weight: 500;
+        }
+        .date-today-btn:hover { background: rgba(31,111,235,0.15); }
+
+        /* custom date picker trigger */
+        .date-picker-wrapper {
+            position: relative;
+            margin-left: auto;
+        }
+        .date-pick-btn {
+            background: #21262d;
+            border: 1px solid #30363d;
+            color: #8b949e;
+            padding: 7px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: 'IBM Plex Sans', sans-serif;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .date-pick-btn:hover { background: #30363d; color: #e6edf3; }
+        #date-input {
+            position: absolute;
+            opacity: 0;
+            pointer-events: none;
+            width: 0; height: 0;
+            top: 100%; left: 0;
+        }
+
+        /* ── Container ── */
+        .container { padding: 24px 32px; }
+
+        /* ── Stats bar ── */
+        .stats-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .stat-chip {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+        }
+        .stat-chip .stat-num {
+            font-family: 'IBM Plex Mono', monospace;
+            font-weight: 600;
+            font-size: 18px;
+            color: #e6edf3;
+        }
+        .stat-chip .stat-lbl { color: #8b949e; font-size: 11px; }
+        .stat-chip.spare .stat-num { color: #f97316; }
+        .stat-chip.regular .stat-num { color: #3fb950; }
+
+        /* ── Card ── */
         .card {
-            background:#ffffff; padding:18px 20px; border-radius:10px;
-            box-shadow:0px 3px 8px rgba(0,0,0,0.12);
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            overflow: hidden;
         }
 
-        table { width:100%; border-collapse:collapse; margin-top:10px;
-                border-radius:8px; overflow:hidden; }
-        th {
-            background:#dfe4ea; padding:10px; text-align:left; font-size:13px;
-            font-weight:600;
+        .card-header {
+            padding: 14px 20px;
+            border-bottom: 1px solid #30363d;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
-        td {
-            padding:9px 10px; border-bottom:1px solid #e3e3e3; font-size:13px;
-            background:#fff;
+        .card-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #8b949e;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
         }
-        tr:hover td { background:#f7f9fc; }
 
         .btn-primary {
-            display:inline-block; padding:8px 14px; border-radius:6px;
-            text-decoration:none; background:#0275d8; color:white;
-            font-size:13px; margin-bottom:10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 14px;
+            border-radius: 6px;
+            text-decoration: none;
+            background: #238636;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 500;
+            border: 1px solid #2ea043;
+            transition: background 0.15s;
         }
-        .btn-primary:hover { background:#025aa5; }
+        .btn-primary:hover { background: #2ea043; }
 
-        /* Trip-type pill */
+        /* ── Table ── */
+        table { width: 100%; border-collapse: collapse; }
+        th {
+            background: #0d1117;
+            padding: 10px 14px;
+            text-align: left;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #8b949e;
+            border-bottom: 1px solid #30363d;
+        }
+        td {
+            padding: 10px 14px;
+            border-bottom: 1px solid #21262d;
+            font-size: 13px;
+            color: #c9d1d9;
+            vertical-align: middle;
+        }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #1c2128; }
+
+        .mono { font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+
+        /* ── Tags ── */
         .tag {
-            display:inline-block;
-            padding:4px 10px;
-            font-size:11px;
-            border-radius:999px;
-            border:1px solid transparent;
-            white-space:nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 10px;
+            font-size: 11px;
+            border-radius: 999px;
+            font-weight: 500;
         }
         .tag-regular {
-            border-color:#d1d5db;
-            background:#f9fafb;
-            color:#374151;
+            background: rgba(63,185,80,0.1);
+            border: 1px solid rgba(63,185,80,0.3);
+            color: #3fb950;
         }
         .tag-spare {
-            border-color:#f97316;
-            background:#fffbeb;
-            color:#c2410c;
-            font-weight:600;
+            background: rgba(249,115,22,0.1);
+            border: 1px solid rgba(249,115,22,0.3);
+            color: #f97316;
+            font-weight: 600;
         }
-        .tag-spare small {
-            font-weight:400;
-            font-size:10px;
-            opacity:0.8;
-        }
+        .tag-spare small { font-weight: 400; font-size: 10px; opacity: 0.8; }
 
-        /* Starting point indicator */
-        .start-point {
-            font-size:12px;
-            color:#f59e0b;
-            font-weight:600;
-        }
-        .start-point-origin {
-            font-size:12px;
-            color:#6b7280;
-        }
-        .start-location {
-            display:block;
-            font-size:11px;
-            color:#6b7280;
-            margin-top:2px;
-        }
+        /* ── Start point ── */
+        .start-point { font-size: 12px; color: #d29922; font-weight: 600; }
+        .start-point-origin { font-size: 12px; color: #6b7280; }
+        .start-location { display: block; font-size: 11px; color: #6b7280; margin-top: 2px; }
 
-        /* Action links */
+        /* ── Actions ── */
         .action-link {
-            color:#2563eb;
-            text-decoration:none;
-            font-size:12px;
-            margin-right:10px;
+            color: #79c0ff;
+            text-decoration: none;
+            font-size: 12px;
+            margin-right: 10px;
+            transition: color 0.15s;
         }
-        .action-link:hover {
-            text-decoration:underline;
+        .action-link:hover { color: #58a6ff; text-decoration: underline; }
+
+        /* ── Empty state ── */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+        .empty-state .empty-icon { font-size: 40px; margin-bottom: 12px; }
+        .empty-state p { color: #6b7280; font-size: 14px; margin: 0; }
+        .empty-state strong { color: #8b949e; }
+
+        /* ── Transition for table rows ── */
+        tbody tr {
+            transition: background 0.1s;
         }
     </style>
 </head>
 <body>
 
 <div class="header">
-    <h2>Schedules – {{ user.zone.name|default:"All Zones" }}</h2>
-    <div>
+    <div class="header-left">
+        <div class="header-logo">🚌</div>
+        <h2>Schedules — <span id="zone-name">{{ user.zone.name|default:"All Zones" }}</span></h2>
+    </div>
+    <nav class="header-nav">
         <a href="/zonal-admin/">Dashboard</a>
         <a href="/zonal-admin/preinforms/">Pre-Informs</a>
         <a href="/zonal-admin/demand/">Demand Alerts</a>
+    </nav>
+</div>
+
+<!-- ── Date Navigator ── -->
+<div class="date-nav-wrapper">
+    <button class="date-nav-btn" onclick="changeDate(-1)">← Prev</button>
+
+    <div class="date-label" id="date-display"></div>
+
+    <button class="date-nav-btn" onclick="changeDate(1)">Next →</button>
+
+    <button class="date-today-btn" id="today-btn" onclick="goToday()">Today</button>
+
+    <div class="date-picker-wrapper">
+        <button class="date-pick-btn" onclick="document.getElementById('date-input').showPicker()">
+            📅 Jump to date
+        </button>
+        <input type="date" id="date-input" onchange="jumpToDate(this.value)">
     </div>
 </div>
 
 <div class="container">
+
+    <!-- Stats bar -->
+    <div class="stats-bar">
+        <div class="stat-chip regular">
+            <div>
+                <div class="stat-num" id="stat-regular">—</div>
+                <div class="stat-lbl">Regular trips</div>
+            </div>
+        </div>
+        <div class="stat-chip spare">
+            <div>
+                <div class="stat-num" id="stat-spare">—</div>
+                <div class="stat-lbl">Spare trips</div>
+            </div>
+        </div>
+        <div class="stat-chip">
+            <div>
+                <div class="stat-num" id="stat-total">—</div>
+                <div class="stat-lbl">Total schedules</div>
+            </div>
+        </div>
+    </div>
+
     <div class="card">
-        <a href="/zonal-admin/assign-bus/" class="btn-primary">+ Assign New Bus</a>
+        <div class="card-header">
+            <span class="card-title">Schedules for <span id="card-date-label"></span></span>
+            <a href="/zonal-admin/assign-bus/" class="btn-primary">+ Assign New Bus</a>
+        </div>
 
         <table>
             <thead>
@@ -125,68 +355,178 @@
                     <th>Actions</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="schedule-tbody">
                 {% for s in schedules %}
-                <tr>
-                    <td>{{ s.id }}</td>
-                    <td>{{ s.bus.number_plate }}</td>
+                <tr data-date="{{ s.date|date:'Y-m-d' }}">
+                    <td class="mono">#{{ s.id }}</td>
+                    <td class="mono">{{ s.bus.number_plate }}</td>
                     <td>{{ s.route.number }} – {{ s.route.name }}</td>
-                    <td>{{ s.date }}</td>
-                    <td>{{ s.departure_time }}</td>
-                    <td>{{ s.arrival_time }}</td>
+                    <td class="mono">{{ s.date }}</td>
+                    <td class="mono">{{ s.departure_time }}</td>
+                    <td class="mono">{{ s.arrival_time }}</td>
                     <td>{{ s.driver.email|truncatechars:20 }}</td>
-                    
+
                     <!-- Trip Type -->
                     <td>
                         {% if s.is_spare_trip %}
                             <span class="tag tag-spare">
                                 🚌 Spare
                                 {% if s.source_alert %}
-                                    <small>(alert #{{ s.source_alert.id }})</small>
+                                    <small>(#{{ s.source_alert.id }})</small>
                                 {% endif %}
                             </span>
                         {% else %}
-                            <span class="tag tag-regular">Regular</span>
+                            <span class="tag tag-regular">✓ Regular</span>
                         {% endif %}
                     </td>
-                    
+
                     <!-- Starting Point -->
                     <td>
                         {% if s.current_stop_sequence > 0 %}
-                            <span class="start-point">
-                                Stop #{{ s.current_stop_sequence }}
-                            </span>
+                            <span class="start-point">Stop #{{ s.current_stop_sequence }}</span>
                             {% if s.starting_stop %}
-                                <span class="start-location">
-                                    {{ s.starting_stop.name }}
-                                </span>
+                                <span class="start-location">{{ s.starting_stop.name }}</span>
                             {% endif %}
                         {% else %}
                             <span class="start-point-origin">Origin</span>
                         {% endif %}
                     </td>
-                    
+
                     <!-- Actions -->
                     <td>
-                        <a href="{% url 'verify-schedule' s.id %}" class="action-link">
-                            🔍 Verify
-                        </a>
-                        <a href="{% url 'schedule-load-prediction' s.id %}" class="action-link">
-                            📊 Forecast
-                        </a>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="10" style="text-align:center; color:#6b7280; padding:20px;">
-                        No schedules defined yet.
+                        <a href="{% url 'verify-schedule' s.id %}" class="action-link">🔍 Verify</a>
+                        <a href="{% url 'schedule-load-prediction' s.id %}" class="action-link">📊 Forecast</a>
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+
+        <!-- empty state shown via JS when no rows match selected date -->
+        <div id="empty-state" class="empty-state" style="display:none;">
+            <div class="empty-icon">📅</div>
+            <p><strong id="empty-date-text"></strong></p>
+            <p>No schedules found for this date.</p>
+        </div>
     </div>
 </div>
+
+<script>
+    // Use server-rendered today to avoid JS timezone mismatches
+    const SERVER_TODAY = "{{ today_date|date:'Y-m-d'|default:'' }}";
+
+    // ── State: init to today ──
+    let currentDate;
+    if (SERVER_TODAY) {
+        const [y, m, d] = SERVER_TODAY.split('-').map(Number);
+        currentDate = new Date(y, m - 1, d);
+    } else {
+        currentDate = new Date();
+        currentDate.setHours(0, 0, 0, 0);
+    }
+
+    // ── Helpers ──
+    function toYMD(d) {
+        // Returns "YYYY-MM-DD" in local time
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+
+    // Get today's YMD — prefer server value if available
+    function getTodayYMD() {
+        if (SERVER_TODAY) return SERVER_TODAY;
+        return toYMD(new Date());
+    }
+
+    function friendlyDate(d) {
+        const todayYMD = getTodayYMD();
+        const ymd = toYMD(d);
+
+        const todayObj = new Date(); todayObj.setHours(0,0,0,0);
+        const yesterday = new Date(todayObj); yesterday.setDate(todayObj.getDate()-1);
+        const tomorrow  = new Date(todayObj); tomorrow.setDate(todayObj.getDate()+1);
+
+        if (ymd === todayYMD)            return `Today — ${d.toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'short'})}`;
+        if (ymd === toYMD(yesterday))    return `Yesterday — ${d.toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'short'})}`;
+        if (ymd === toYMD(tomorrow))     return `Tomorrow — ${d.toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'short'})}`;
+        return d.toLocaleDateString('en-IN', {weekday:'long', day:'numeric', month:'short', year:'numeric'});
+    }
+
+    function isToday(d) {
+        return toYMD(d) === getTodayYMD();
+    }
+
+    // ── Filter rows ──
+    function filterTable() {
+        const ymd = toYMD(currentDate);
+        const rows = document.querySelectorAll('#schedule-tbody tr[data-date]');
+
+        let regular = 0, spare = 0, visible = 0;
+
+        rows.forEach(row => {
+            const rowDate = row.getAttribute('data-date');
+            if (rowDate === ymd) {
+                row.style.display = '';
+                visible++;
+                if (row.querySelector('.tag-spare')) spare++;
+                else regular++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        // Empty state
+        const emptyState = document.getElementById('empty-state');
+        const tbody = document.getElementById('schedule-tbody');
+        if (visible === 0) {
+            emptyState.style.display = 'block';
+            document.getElementById('empty-date-text').textContent = friendlyDate(currentDate);
+        } else {
+            emptyState.style.display = 'none';
+        }
+
+        // Stats
+        document.getElementById('stat-regular').textContent = regular;
+        document.getElementById('stat-spare').textContent = spare;
+        document.getElementById('stat-total').textContent = visible;
+
+        // Date labels
+        const label = friendlyDate(currentDate);
+        document.getElementById('date-display').textContent = label;
+        document.getElementById('card-date-label').textContent = label;
+
+        // Today highlight
+        const dateEl = document.getElementById('date-display');
+        dateEl.classList.toggle('is-today', isToday(currentDate));
+
+        // Today button visibility
+        document.getElementById('today-btn').style.display = isToday(currentDate) ? 'none' : '';
+    }
+
+    // ── Controls ──
+    function changeDate(delta) {
+        currentDate.setDate(currentDate.getDate() + delta);
+        filterTable();
+    }
+
+    function goToday() {
+        currentDate = new Date();
+        currentDate.setHours(0, 0, 0, 0);
+        filterTable();
+    }
+
+    function jumpToDate(val) {
+        if (!val) return;
+        const [y, m, d] = val.split('-').map(Number);
+        currentDate = new Date(y, m - 1, d);
+        filterTable();
+    }
+
+    // ── Init: show today ──
+    filterTable();
+</script>
 
 </body>
 </html>
