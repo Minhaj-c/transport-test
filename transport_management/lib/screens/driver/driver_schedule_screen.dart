@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/schedule_model.dart';
 import '../../services/api_service.dart';
 import '../../services/location_service.dart';
 import '../../widgets/loading_widget.dart';
+
+// Keys for persisting running state
+const String _kIsRunning     = 'bus_is_running';
+const String _kActiveSchedId = 'bus_active_schedule_id';
 
 class DriverScheduleScreen extends StatefulWidget {
   const DriverScheduleScreen({super.key});
@@ -27,7 +32,23 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
   @override
   void initState() {
     super.initState();
-    _loadSchedules();
+    _restoreRunningState();
+  }
+
+  // ── Restore persisted running state, then load schedules ──────────────────
+  Future<void> _restoreRunningState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final wasRunning   = prefs.getBool(_kIsRunning) ?? false;
+      final activeSchedId = prefs.getInt(_kActiveSchedId);
+
+      if (wasRunning && activeSchedId != null) {
+        // Will be matched after schedules load
+        _isRunning = true;
+      }
+    } catch (_) {}
+
+    await _loadSchedules();
   }
 
   Future<void> _loadSchedules() async {
@@ -46,26 +67,43 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
             s.date.day == now.day;
       }).toList();
 
-      if (_isRunning && _activeSchedule != null) {
-        final matchingSchedule = todaySchedules.firstWhere(
-          (s) => s.id == _activeSchedule!.id,
-          orElse: () => _activeSchedule!,
-        );
+      // Restore active schedule from prefs if running
+      if (_isRunning) {
+        final prefs = await SharedPreferences.getInstance();
+        final activeSchedId = prefs.getInt(_kActiveSchedId);
 
-        if (mounted) {
-          setState(() {
-            _schedules = schedules;
-            _activeSchedule = matchingSchedule;
-            _isLoading = false;
-          });
+        final matched = activeSchedId != null
+            ? todaySchedules.cast<Schedule?>().firstWhere(
+                (s) => s!.id == activeSchedId,
+                orElse: () => null,
+              )
+            : null;
+
+        if (matched != null) {
+          if (mounted) {
+            setState(() {
+              _schedules = schedules;
+              _activeSchedule = matched;
+              _isRunning = true;
+              _isLoading = false;
+            });
+          }
+          // Resume location tracking
+          _startLocationTracking(matched);
+          return;
+        } else {
+          // Active schedule not found (maybe date changed), clear persisted state
+          await _clearPersistedRunningState();
+          _isRunning = false;
+          _activeSchedule = null;
         }
-      } else {
-        if (mounted) {
-          setState(() {
-            _schedules = schedules;
-            _isLoading = false;
-          });
-        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _schedules = schedules;
+          _isLoading = false;
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -77,6 +115,20 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
     }
   }
 
+  // ── Persist / clear running state ────────────────────────────────────────
+  Future<void> _persistRunningState(int scheduleId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kIsRunning, true);
+    await prefs.setInt(_kActiveSchedId, scheduleId);
+  }
+
+  Future<void> _clearPersistedRunningState() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_kIsRunning);
+    await prefs.remove(_kActiveSchedId);
+  }
+
+  // ── Start bus ────────────────────────────────────────────────────────────
   Future<void> _startBus(Schedule schedule) async {
     setState(() => _isStarting = true);
 
@@ -95,6 +147,9 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
       );
 
       if (!mounted) return;
+
+      // Persist so reopening the app restores this state
+      await _persistRunningState(schedule.id);
 
       setState(() {
         _activeSchedule = schedule;
@@ -169,7 +224,7 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
     });
   }
 
-  // 🔥 UPDATED: Handle completing trips with cascade handoff check
+  // ── Stop bus ─────────────────────────────────────────────────────────────
   Future<void> _stopBus() async {
     if (!mounted || _activeSchedule == null) return;
 
@@ -185,7 +240,6 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
         if (!mounted) return;
 
         if (result['has_handoff'] == true) {
-          // Show handoff notification
           final handoff = result['handoff_schedule'];
 
           ScaffoldMessenger.of(context).showSnackBar(
@@ -235,7 +289,6 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
         }
       } catch (e) {
         print('Error checking handoff: $e');
-        // Continue with normal stop
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Row(
@@ -265,13 +318,14 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
       );
     }
 
-    // Stop tracking
+    // Clear persisted running state
+    await _clearPersistedRunningState();
+
     setState(() {
       _isRunning = false;
       _activeSchedule = null;
     });
 
-    // Reload schedules
     await _loadSchedules();
   }
 
@@ -364,7 +418,6 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
     );
   }
 
-  // 🔥 NEW: Report delayed arrival with cascade assignment
   Future<void> _reportDelayedArrival(Schedule schedule) async {
     final TimeOfDay? picked = await showTimePicker(
       context: context,
@@ -393,7 +446,6 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
           ),
         );
       } else if (result['success'] == true && result['spare_bus_assigned'] == true) {
-        // Show cascade assignment notification
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(result['message'] ?? 'Spare bus assigned'),
@@ -401,7 +453,7 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
             duration: const Duration(seconds: 6),
           ),
         );
-        await _loadSchedules(); // Reload to see changes
+        await _loadSchedules();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -526,6 +578,8 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
     super.dispose();
   }
 }
+
+// ── _ActiveScheduleCard and _ScheduleCard are unchanged ─────────────────────
 
 class _ActiveScheduleCard extends StatelessWidget {
   final Schedule schedule;
@@ -660,8 +714,6 @@ class _ActiveScheduleCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          
-          // 🔥 NEW: Report delay button (only for spare trips)
           if (schedule.isSpareTrip)
             SizedBox(
               width: double.infinity,
@@ -679,10 +731,7 @@ class _ActiveScheduleCard extends StatelessWidget {
                 ),
               ),
             ),
-          
-          if (schedule.isSpareTrip)
-            const SizedBox(height: 8),
-          
+          if (schedule.isSpareTrip) const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
@@ -839,7 +888,7 @@ class _ScheduleCard extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // Start button
+            // Show Start button only if today, not active, and not currently running another bus
             if (isToday && !isActive)
               SizedBox(
                 width: double.infinity,
