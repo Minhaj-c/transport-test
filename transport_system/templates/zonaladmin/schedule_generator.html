@@ -2,91 +2,160 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Schedule Generator</title>
+    <title>Schedule Generator – Zonal Admin</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        *, *::before, *::after { box-sizing: border-box; }
 
         body {
-            font-family: system-ui, -apple-system, sans-serif;
-            background: #eef1f7;
-            color: #111827;
+            font-family: 'IBM Plex Sans', sans-serif;
+            margin: 0;
+            background: #0d1117;
+            color: #e6edf3;
+            min-height: 100vh;
         }
 
+        /* ── Header ── */
         .header {
-            background: #004aad;
-            color: white;
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
             padding: 16px 32px;
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 16px;
         }
-        .header h2 { font-size: 20px; flex: 1; }
+        .header-left { 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+        }
+        .header-logo {
+            width: 32px; 
+            height: 32px;
+            background: #1f6feb;
+            border-radius: 8px;
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            font-size: 16px;
+        }
+        .header h2 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: #e6edf3;
+            letter-spacing: 0.01em;
+        }
         .back-link {
-            color: #dbe7ff;
+            color: #8b949e;
             text-decoration: none;
             font-size: 13px;
+            transition: color 0.15s;
+        }
+        .back-link:hover {
+            color: #e6edf3;
         }
 
-        .container {
-            max-width: 1100px;
+        /* ── Container ── */
+        .container { 
+            max-width: 1200px;
             margin: 24px auto;
-            padding: 0 20px;
+            padding: 0 32px; 
         }
 
         /* ── Messages ── */
         .alert {
-            padding: 12px 16px;
-            border-radius: 6px;
-            margin-bottom: 16px;
+            padding: 14px 18px;
+            border-radius: 10px;
+            margin-bottom: 20px;
             font-size: 13px;
             font-weight: 500;
+            border: 1px solid;
         }
-        .alert-success { background:#d1fae5; color:#065f46; border:1px solid #6ee7b7; }
-        .alert-warning { background:#fef3c7; color:#92400e; border:1px solid #fcd34d; }
-        .alert-error   { background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; }
+        .alert-success { 
+            background: rgba(63, 185, 80, 0.1); 
+            border-color: rgba(63, 185, 80, 0.3); 
+            color: #3fb950; 
+        }
+        .alert-warning { 
+            background: rgba(249, 115, 22, 0.1); 
+            border-color: rgba(249, 115, 22, 0.3); 
+            color: #f97316; 
+        }
+        .alert-error { 
+            background: rgba(248, 81, 73, 0.1); 
+            border-color: rgba(248, 81, 73, 0.3); 
+            color: #f85149; 
+        }
 
         /* ── Cards ── */
         .card {
-            background: white;
-            border: 1px solid #e5e7eb;
+            background: #161b22;
+            border: 1px solid #30363d;
             border-radius: 10px;
-            padding: 22px;
-            margin-bottom: 20px;
+            padding: 20px;
+            margin-bottom: 24px;
         }
         .card-title {
             font-size: 16px;
-            font-weight: 700;
+            font-weight: 600;
+            color: #e6edf3;
             margin-bottom: 16px;
-            color: #111827;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
-        /* ── Stat row ── */
-        .stat-row {
+        /* ── Current Week Banner ── */
+        .current-banner {
+            background: linear-gradient(135deg, #1f6feb, #238636);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 24px;
+            border: 1px solid #30363d;
+        }
+        .banner-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: 12px;
-            margin-bottom: 16px;
+            gap: 16px;
+            margin-bottom: 20px;
         }
-        .stat-box {
-            background: #f9fafb;
-            border: 1px solid #e5e7eb;
+        .banner-box {
+            background: rgba(0, 0, 0, 0.2);
             border-radius: 8px;
-            padding: 14px 16px;
+            padding: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
-        .stat-label { font-size: 11px; color:#6b7280; text-transform:uppercase; margin-bottom:4px; }
-        .stat-value { font-size: 22px; font-weight: 700; color:#004aad; }
-        .stat-value.green { color:#059669; }
-        .stat-value.red   { color:#dc2626; }
+        .banner-box .label {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 4px;
+        }
+        .banner-box .value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        .banner-box .sub {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.6);
+            margin-top: 4px;
+        }
 
-        /* ── Week action card ── */
+        /* ── Week Cards ── */
         .week-card {
-            border: 2px solid #e5e7eb;
+            border: 1px solid #30363d;
             border-radius: 10px;
             padding: 18px;
             margin-bottom: 16px;
-            background: white;
+            background: #0d1117;
         }
-        .week-card.has-data { border-color:#10b981; background:#f0fdf4; }
+        .week-card.has-data { 
+            border-color: #3fb950; 
+            background: rgba(63, 185, 80, 0.05);
+        }
 
         .week-header {
             display: flex;
@@ -94,123 +163,247 @@
             align-items: flex-start;
             margin-bottom: 12px;
         }
-        .week-label { font-size: 16px; font-weight: 700; }
-        .week-dates { font-size: 12px; color:#6b7280; margin-top:2px; }
+        .week-label { 
+            font-size: 15px; 
+            font-weight: 600; 
+            color: #e6edf3;
+        }
+        .week-dates { 
+            font-size: 12px; 
+            color: #8b949e; 
+            margin-top: 2px; 
+        }
 
         .badge {
-            padding: 3px 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            font-size: 11px;
             border-radius: 999px;
+            font-weight: 500;
+            border: 1px solid;
+        }
+        .badge-green { 
+            background: rgba(63, 185, 80, 0.1); 
+            border-color: rgba(63, 185, 80, 0.3); 
+            color: #3fb950; 
+        }
+        .badge-red { 
+            background: rgba(248, 81, 73, 0.1); 
+            border-color: rgba(248, 81, 73, 0.3); 
+            color: #f85149; 
+        }
+        .badge-gray { 
+            background: rgba(110, 118, 129, 0.1); 
+            border-color: #30363d; 
+            color: #8b949e; 
+        }
+
+        .info-text { 
+            font-size: 13px; 
+            color: #8b949e; 
+            margin-bottom: 12px; 
+        }
+
+        /* ── Buttons ── */
+        .btn-row { 
+            display: flex; 
+            gap: 10px; 
+            flex-wrap: wrap; 
+            align-items: center; 
+        }
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            border: 1px solid;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s;
+        }
+        .btn:disabled { 
+            opacity: 0.5; 
+            cursor: not-allowed; 
+        }
+        .btn-green  { 
+            background: #238636; 
+            border-color: #2ea043; 
+            color: #fff; 
+        }
+        .btn-green:hover:not(:disabled) { 
+            background: #2ea043; 
+        }
+        .btn-blue   { 
+            background: #1f6feb; 
+            border-color: #388bfd; 
+            color: #fff; 
+        }
+        .btn-blue:hover:not(:disabled) { 
+            background: #388bfd; 
+        }
+        .btn-orange { 
+            background: #f97316; 
+            border-color: #fb923c; 
+            color: #fff; 
+        }
+        .btn-orange:hover:not(:disabled) { 
+            background: #fb923c; 
+        }
+
+        .check-row { 
+            display: flex; 
+            align-items: center; 
+            gap: 8px; 
+            margin: 12px 0; 
+            font-size: 13px; 
+            color: #8b949e;
+        }
+        .check-row input[type="checkbox"] {
+            accent-color: #1f6feb;
+        }
+
+        /* ── Tables ── */
+        .table-container {
+            overflow-x: auto;
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            font-size: 13px; 
+        }
+        th {
+            background: #0d1117;
+            padding: 10px 12px;
+            text-align: left;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #8b949e;
+            border-bottom: 1px solid #30363d;
+            white-space: nowrap;
+        }
+        td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #21262d;
+            color: #c9d1d9;
+            white-space: nowrap;
+        }
+        tbody tr:hover td {
+            background: #1c2128;
+        }
+
+        /* ── Profit Table ── */
+        .profit-section {
+            margin-top: 14px;
+            border-top: 1px solid #30363d;
+            padding-top: 14px;
+        }
+        .profit-section h4 { 
+            font-size: 13px; 
+            font-weight: 600; 
+            color: #8b949e; 
+            margin-bottom: 10px; 
+        }
+        .profit-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            font-size: 12px; 
+        }
+        .profit-table th {
+            background: #0d1117;
+            padding: 8px 10px;
+            text-align: left;
+            font-size: 11px;
+            color: #8b949e;
+            border-bottom: 1px solid #30363d;
+        }
+        .profit-table td { 
+            padding: 8px 10px; 
+            border-bottom: 1px solid #21262d; 
+        }
+        .profit-table tr:hover td { 
+            background: #1c2128; 
+        }
+
+        /* ── Rank Badges ── */
+        .rank-circle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
             font-size: 11px;
             font-weight: 600;
         }
-        .badge-green { background:#d1fae5; color:#065f46; }
-        .badge-red   { background:#fee2e2; color:#991b1b; }
-        .badge-gray  { background:#f3f4f6; color:#374151; }
-
-        .info-text { font-size: 13px; color:#6b7280; margin-bottom:12px; }
-
-        /* ── Buttons ── */
-        .btn-row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-
-        .btn {
-            padding: 9px 18px;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 600;
-            border: none;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-            line-height: 1;
+        .rank-1 { 
+            background: #fbbf24; 
+            color: #000; 
         }
-        .btn-green  { background:#10b981; color:white; }
-        .btn-green:hover  { background:#059669; }
-        .btn-blue   { background:#3b82f6; color:white; }
-        .btn-blue:hover   { background:#2563eb; }
-        .btn-orange { background:#f59e0b; color:white; }
-        .btn-orange:hover { background:#d97706; }
-        .btn-gray   { background:#6b7280; color:white; }
-        .btn-gray:hover   { background:#4b5563; }
-        .btn:disabled { opacity:0.5; cursor:not-allowed; }
-
-        .check-row { display:flex; align-items:center; gap:8px; margin:10px 0; font-size:13px; }
-
-        /* ── Per-week profit table ── */
-        .profit-section {
-            margin-top: 14px;
-            border-top: 1px solid #e5e7eb;
-            padding-top: 14px;
+        .rank-2 { 
+            background: #9ca3af; 
+            color: #fff; 
         }
-        .profit-section h4 { font-size:13px; font-weight:600; color:#374151; margin-bottom:10px; }
-
-        .profit-table { width:100%; border-collapse:collapse; font-size:12px; }
-        .profit-table th {
-            text-align:left;
-            padding:8px 10px;
-            background:#f9fafb;
-            color:#6b7280;
-            font-size:11px;
-            text-transform:uppercase;
+        .rank-3 { 
+            background: #cd7f32; 
+            color: #fff; 
         }
-        .profit-table td { padding:8px 10px; border-bottom:1px solid #f3f4f6; }
-        .profit-table tr:last-child td { border-bottom:none; }
-        .profit-table tr:hover td { background:#f9fafb; }
 
-        .rank-circle {
-            display:inline-flex;
-            align-items:center;
-            justify-content:center;
-            width:22px;
-            height:22px;
-            border-radius:50%;
-            background:#e5e7eb;
-            font-size:11px;
-            font-weight:700;
+        /* ── Profit Colors ── */
+        .profit-pos { 
+            color: #3fb950; 
+            font-weight: 600; 
+            font-family: 'IBM Plex Mono', monospace;
         }
-        .rank-1 { background:#fbbf24; color:white; }
-        .rank-2 { background:#9ca3af; color:white; }
-        .rank-3 { background:#cd7f32; color:white; }
+        .profit-neg { 
+            color: #f85149; 
+            font-weight: 600; 
+            font-family: 'IBM Plex Mono', monospace;
+        }
 
-        .profit-pos { color:#059669; font-weight:600; }
-        .profit-neg { color:#dc2626; font-weight:600; }
+        /* ── Text Utilities ── */
+        .mono {
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        .text-strong {
+            color: #e6edf3;
+            font-weight: 500;
+        }
+        .text-muted {
+            color: #8b949e;
+            font-size: 12px;
+        }
 
-        /* ── Week list ── */
-        .week-list-item {
-            display:flex;
-            justify-content:space-between;
-            align-items:center;
-            padding:14px;
-            border-bottom:1px solid #f3f4f6;
-        }
-        .week-list-item:last-child { border-bottom:none; }
-
-        /* ── Current week banner ── */
-        .current-banner {
-            background: linear-gradient(135deg,#004aad,#0066dd);
-            color: white;
-            border-radius: 10px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
-        .current-banner .label { font-size:12px; opacity:0.8; text-transform:uppercase; margin-bottom:6px; }
-        .current-banner .value { font-size:28px; font-weight:700; }
-        .current-banner .sub   { font-size:13px; opacity:0.8; margin-top:4px; }
-        .banner-grid {
-            display:grid;
-            grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));
-            gap:16px;
-        }
-        .banner-box {
-            background:rgba(255,255,255,0.12);
-            border-radius:8px;
-            padding:14px;
+        /* ── Responsive ── */
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 16px;
+            }
+            .header {
+                flex-direction: column;
+                gap: 12px;
+                align-items: flex-start;
+            }
+            .week-header {
+                flex-direction: column;
+                gap: 8px;
+            }
         }
     </style>
 </head>
 <body>
 
 <div class="header">
-    <h2>📅 Schedule Generator</h2>
+    <div class="header-left">
+        <div class="header-logo">📅</div>
+        <h2>Schedule Generator</h2>
+    </div>
     <a href="/zonal-admin/" class="back-link">← Dashboard</a>
 </div>
 
@@ -226,7 +419,7 @@
         <div class="banner-grid">
             <div class="banner-box">
                 <div class="label">📍 Current Week</div>
-                <div class="value" style="font-size:15px;">{{ current_week_start }} → {{ current_week_end }}</div>
+                <div class="value">{{ current_week_start }} → {{ current_week_end }}</div>
             </div>
             <div class="banner-box">
                 <div class="label">📋 Schedules</div>
@@ -247,33 +440,35 @@
 
         <!-- Current week profit table inside banner -->
         {% if current_has_profits %}
-        <div style="margin-top:16px; background:rgba(255,255,255,0.08); border-radius:8px; overflow:hidden;">
-            <table style="width:100%; border-collapse:collapse; font-size:12px; color:white;">
-                <thead>
-                    <tr style="background:rgba(0,0,0,0.15);">
-                        <th style="padding:8px 12px; text-align:left;">Rank</th>
-                        <th style="padding:8px 12px; text-align:left;">Bus</th>
-                        <th style="padding:8px 12px; text-align:right;">Passengers</th>
-                        <th style="padding:8px 12px; text-align:right;">Revenue</th>
-                        <th style="padding:8px 12px; text-align:right;">Fuel Cost</th>
-                        <th style="padding:8px 12px; text-align:right;">Profit</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for perf in current_week_profits %}
-                    <tr style="border-top:1px solid rgba(255,255,255,0.1);">
-                        <td style="padding:8px 12px;">
-                            <span style="font-weight:700;">{{ perf.profit_rank }}</span>
-                        </td>
-                        <td style="padding:8px 12px; font-weight:600;">{{ perf.bus.number_plate }}</td>
-                        <td style="padding:8px 12px; text-align:right;">{{ perf.total_passengers }}</td>
-                        <td style="padding:8px 12px; text-align:right;">₹{{ perf.total_revenue|floatformat:0 }}</td>
-                        <td style="padding:8px 12px; text-align:right;">₹{{ perf.total_fuel_cost|floatformat:0 }}</td>
-                        <td style="padding:8px 12px; text-align:right; font-weight:700;">₹{{ perf.total_profit|floatformat:0 }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div style="margin-top:16px; background:rgba(0,0,0,0.2); border-radius:8px; overflow:hidden; border:1px solid rgba(255,255,255,0.1);">
+            <div class="table-container">
+                <table style="color:#fff;">
+                    <thead>
+                        <tr style="background:rgba(0,0,0,0.3);">
+                            <th style="color:rgba(255,255,255,0.7);">Rank</th>
+                            <th style="color:rgba(255,255,255,0.7);">Bus</th>
+                            <th style="color:rgba(255,255,255,0.7); text-align:right;">Passengers</th>
+                            <th style="color:rgba(255,255,255,0.7); text-align:right;">Revenue</th>
+                            <th style="color:rgba(255,255,255,0.7); text-align:right;">Fuel Cost</th>
+                            <th style="color:rgba(255,255,255,0.7); text-align:right;">Profit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for perf in current_week_profits %}
+                        <tr style="border-top:1px solid rgba(255,255,255,0.1);">
+                            <td style="padding:8px 12px;">
+                                <span style="font-weight:700;">{{ perf.profit_rank }}</span>
+                            </td>
+                            <td style="padding:8px 12px; font-weight:600;">{{ perf.bus.number_plate }}</td>
+                            <td style="padding:8px 12px; text-align:right;">{{ perf.total_passengers }}</td>
+                            <td style="padding:8px 12px; text-align:right;">₹{{ perf.total_revenue|floatformat:0 }}</td>
+                            <td style="padding:8px 12px; text-align:right;">₹{{ perf.total_fuel_cost|floatformat:0 }}</td>
+                            <td style="padding:8px 12px; text-align:right; font-weight:700;">₹{{ perf.total_profit|floatformat:0 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
         {% endif %}
     </div>
@@ -373,24 +568,24 @@
         <div class="card-title">📊 All Weeks</div>
 
         {% for week in recent_weeks %}
-        <div style="border:1px solid {% if week.is_current %}#10b981{% else %}#e5e7eb{% endif %};
+        <div style="border:1px solid {% if week.is_current %}#3fb950{% else %}#30363d{% endif %};
                     border-radius:8px; margin-bottom:14px; overflow:hidden;">
 
             <!-- Week header row -->
-            <div style="padding:14px 16px; background:{% if week.is_current %}#f0fdf4{% else %}#f9fafb{% endif %};
-                        display:flex; justify-content:space-between; align-items:center;">
+            <div style="padding:14px 16px; background:{% if week.is_current %}#1c2128{% else %}#0d1117{% endif %};
+                        display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #30363d;">
                 <div>
-                    <span style="font-weight:700; font-size:14px;">
+                    <span style="font-weight:700; font-size:14px; color:#e6edf3;">
                         {% if week.is_current %}📍 {% endif %}
                         {{ week.start_str }} to {{ week.end_str }}
                     </span>
                     {% if week.is_current %}
                     <span class="badge badge-green" style="margin-left:8px;">Current</span>
                     {% endif %}
-                    <div style="font-size:12px; color:#6b7280; margin-top:3px;">
+                    <div style="font-size:12px; color:#8b949e; margin-top:3px;">
                         {{ week.count }} schedules
                         {% if week.has_profits %}
-                            | 💰 Total: ₹{{ week.total_profit|floatformat:0 }}
+                            | 💰 Total: <span class="mono">₹{{ week.total_profit|floatformat:0 }}</span>
                             | 👥 {{ week.total_passengers }} passengers
                         {% endif %}
                     </div>
@@ -402,19 +597,19 @@
                     <form method="POST" action="{% url 'calculate-week-profits' %}" style="display:inline;">
                         {% csrf_token %}
                         <input type="hidden" name="week_start" value="{{ week.start_str }}">
-                        <button type="submit" class="btn btn-blue" style="font-size:12px; padding:7px 14px;">
+                        <button type="submit" class="btn btn-blue" style="font-size:12px; padding:6px 12px;">
                             📊 Calculate Profit
                         </button>
                     </form>
                     {% else %}
-                    <span style="font-size:12px; color:#059669; font-weight:600;">✅ Profit Calculated</span>
+                    <span style="font-size:12px; color:#3fb950; font-weight:600;">✅ Profit Calculated</span>
                     {% endif %}
                 </div>
             </div>
 
             <!-- Profit table (only shows AFTER calculate profit clicked) -->
             {% if week.has_profits %}
-            <div style="padding:0;">
+            <div class="table-container" style="padding:0;">
                 <table class="profit-table">
                     <thead>
                         <tr>
@@ -435,11 +630,11 @@
                                     {{ perf.profit_rank }}
                                 </span>
                             </td>
-                            <td style="font-weight:600;">{{ perf.bus.number_plate }}</td>
-                            <td>{{ perf.total_trips }}</td>
-                            <td>{{ perf.total_passengers }}</td>
-                            <td>₹{{ perf.total_revenue|floatformat:0 }}</td>
-                            <td>₹{{ perf.total_fuel_cost|floatformat:0 }}</td>
+                            <td><span class="text-strong">{{ perf.bus.number_plate }}</span></td>
+                            <td class="mono">{{ perf.total_trips }}</td>
+                            <td class="mono">{{ perf.total_passengers }}</td>
+                            <td class="mono">₹{{ perf.total_revenue|floatformat:0 }}</td>
+                            <td class="mono">₹{{ perf.total_fuel_cost|floatformat:0 }}</td>
                             <td>
                                 {% if perf.total_profit >= 0 %}
                                 <span class="profit-pos">₹{{ perf.total_profit|floatformat:0 }}</span>

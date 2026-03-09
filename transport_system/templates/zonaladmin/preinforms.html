@@ -2,230 +2,390 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Zonal Pre-Informs</title>
+    <title>Zonal Pre-Informs – Zonal Admin</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
+        *, *::before, *::after { box-sizing: border-box; }
+
         body {
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-family: 'IBM Plex Sans', sans-serif;
             margin: 0;
-            background: #eef1f7;
+            background: #0d1117;
+            color: #e6edf3;
+            min-height: 100vh;
         }
+
+        /* ── Header ── */
         .header {
-            background: #004aad;
-            color: white;
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
             padding: 16px 32px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+        .header-left { 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+        }
+        .header-logo {
+            width: 32px; 
+            height: 32px;
+            background: #1f6feb;
+            border-radius: 8px;
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            font-size: 16px;
         }
         .header h2 {
             margin: 0;
-            font-size: 20px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #e6edf3;
+            letter-spacing: 0.01em;
+        }
+        .zone-badge {
+            display: inline-block;
+            background: #21262d;
+            color: #8b949e;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+            margin-left: 8px;
+            border: 1px solid #30363d;
         }
         .header small {
-            opacity: 0.9;
             font-size: 13px;
+            color: #8b949e;
+            display: block;
+            margin-top: 4px;
+        }
+        .header-nav { 
+            display: flex; 
+            gap: 4px; 
         }
         .header-nav a {
-            color: #dbe7ff;
+            color: #8b949e;
             text-decoration: none;
-            margin-left: 16px;
             font-size: 13px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            transition: background 0.15s, color 0.15s;
         }
-        .header-nav a:hover {
-            text-decoration: underline;
-        }
-
-        .container {
-            width: 94%;
-            max-width: 1200px;
-            margin: 24px auto 40px;
+        .header-nav a:hover { 
+            background: #21262d; 
+            color: #e6edf3; 
         }
 
+        /* ── Container ── */
+        .container { 
+            max-width: 1400px;
+            margin: 24px auto;
+            padding: 0 32px; 
+        }
+
+        /* ── Filters Bar ── */
         .filters {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 16px;
+            margin-bottom: 24px;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 16px 20px;
         }
         .filters form {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 12px;
         }
         .filters label {
             font-size: 13px;
-            color: #555;
+            color: #8b949e;
         }
         .filters input[type="date"] {
-            padding: 6px 8px;
+            background: #21262d;
+            border: 1px solid #30363d;
             border-radius: 6px;
-            border: 1px solid #cfd4e3;
+            padding: 8px 12px;
             font-size: 13px;
+            color: #e6edf3;
+            font-family: 'IBM Plex Sans', sans-serif;
+        }
+        .filters input[type="date"]:focus {
+            outline: none;
+            border-color: #1f6feb;
+        }
+        .filters input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(0.8);
         }
         .btn {
-            padding: 7px 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
             border-radius: 6px;
-            border: none;
-            cursor: pointer;
             font-size: 13px;
+            font-weight: 500;
+            border: 1px solid;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-decoration: none;
         }
         .btn-primary {
-            background: #006fee;
-            color: white;
+            background: #238636;
+            color: #fff;
+            border-color: #2ea043;
         }
         .btn-primary:hover {
-            opacity: 0.9;
+            background: #2ea043;
         }
         .btn-danger {
-            background: #e11d48;
-            color: white;
+            background: #da3633;
+            color: #fff;
+            border-color: #f85149;
         }
         .btn-danger:hover {
-            opacity: 0.9;
+            background: #f85149;
         }
         .btn-outline {
-            background: white;
-            border: 1px solid #cfd4e3;
-            color: #333;
+            background: transparent;
+            color: #8b949e;
+            border-color: #30363d;
+        }
+        .btn-outline:hover {
+            background: #21262d;
+            color: #e6edf3;
         }
 
+        /* ── KPI Grid ── */
         .kpi-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 14px;
-            margin-bottom: 24px;
-        }
-        .kpi-card {
-            background: #ffffff;
-            border-radius: 10px;
-            padding: 14px 16px;
-            box-shadow: 0 2px 6px rgba(15,23,42,0.08);
-        }
-        .kpi-label {
-            font-size: 12px;
-            color: #6b7280;
-        }
-        .kpi-value {
-            font-size: 22px;
-            font-weight: 600;
-            margin-top: 6px;
-            color: #111827;
-        }
-        .kpi-sub {
-            font-size: 11px;
-            color: #9ca3af;
-            margin-top: 4px;
-        }
-
-        .section-title {
-            margin: 18px 0 8px;
-            font-size: 15px;
-            font-weight: 600;
-            color: #111827;
-        }
-        .section-subtitle {
-            font-size: 12px;
-            color: #6b7280;
-            margin-bottom: 6px;
-        }
-
-        .two-col {
-            display: grid;
-            grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.1fr);
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 16px;
             margin-bottom: 24px;
         }
-        .card {
-            background: #ffffff;
+        .kpi-card {
+            background: #161b22;
+            border: 1px solid #30363d;
             border-radius: 10px;
-            padding: 12px 14px;
-            box-shadow: 0 1px 4px rgba(15,23,42,0.08);
-            overflow-x: auto;
+            padding: 16px 20px;
+        }
+        .kpi-label {
+            font-size: 12px;
+            color: #8b949e;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
+        }
+        .kpi-value {
+            font-size: 28px;
+            font-weight: 600;
+            color: #e6edf3;
+            line-height: 1;
+            margin-bottom: 6px;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        .kpi-sub {
+            font-size: 11px;
+            color: #6e7681;
         }
 
+        /* ── Section Headers ── */
+        .section-title {
+            margin: 24px 0 8px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #e6edf3;
+        }
+        .section-subtitle {
+            font-size: 13px;
+            color: #8b949e;
+            margin-bottom: 16px;
+        }
+
+        /* ── Two Column Layout ── */
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        /* ── Card ── */
+        .card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        /* ── Table Styles ── */
+        .table-container {
+            overflow-x: auto;
+        }
         table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 12px;
-        }
-        th, td {
-            padding: 7px 6px;
-            text-align: left;
-            border-bottom: 1px solid #e5e7eb;
-            white-space: nowrap;
+            font-size: 13px;
         }
         th {
+            background: #0d1117;
+            padding: 10px 16px;
+            text-align: left;
             font-size: 11px;
+            font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: .03em;
-            color: #6b7280;
-            background: #f9fafb;
+            letter-spacing: 0.05em;
+            color: #8b949e;
+            border-bottom: 1px solid #30363d;
+            white-space: nowrap;
         }
-        tr:nth-child(even) td {
-            background: #fafafa;
+        td {
+            padding: 10px 16px;
+            border-bottom: 1px solid #21262d;
+            color: #c9d1d9;
+            white-space: nowrap;
+        }
+        tbody tr:hover td {
+            background: #1c2128;
         }
 
+        /* ── Badges ── */
         .badge {
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
             font-size: 11px;
-            padding: 2px 8px;
             border-radius: 999px;
+            font-weight: 500;
+            border: 1px solid;
         }
         .badge-pending {
-            background: #fef3c7;
-            color: #92400e;
+            background: rgba(249, 115, 22, 0.1);
+            border-color: rgba(249, 115, 22, 0.3);
+            color: #f97316;
         }
         .badge-noted {
-            background: #dbeafe;
-            color: #1d4ed8;
+            background: rgba(31, 111, 235, 0.1);
+            border-color: rgba(31, 111, 235, 0.3);
+            color: #1f6feb;
         }
         .badge-completed {
-            background: #dcfce7;
-            color: #166534;
+            background: rgba(63, 185, 80, 0.1);
+            border-color: rgba(63, 185, 80, 0.3);
+            color: #3fb950;
         }
         .badge-cancelled {
-            background: #fee2e2;
-            color: #b91c1c;
+            background: rgba(248, 81, 73, 0.1);
+            border-color: rgba(248, 81, 73, 0.3);
+            color: #f85149;
         }
 
+        /* ── Pill ── */
         .pill {
-            display: inline-block;
-            padding: 3px 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
             border-radius: 999px;
-            background: #eff6ff;
-            color: #1d4ed8;
+            background: #21262d;
+            color: #8b949e;
             font-size: 11px;
+            border: 1px solid #30363d;
         }
 
+        /* ── Text Utilities ── */
+        .mono {
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        .text-strong {
+            color: #e6edf3;
+            font-weight: 500;
+        }
         .muted {
-            color: #6b7280;
+            color: #6e7681;
+            font-size: 12px;
+        }
+
+        /* ── Action Group ── */
+        .action-group {
+            display: flex;
+            gap: 6px;
+        }
+        .btn-sm {
+            padding: 5px 10px;
             font-size: 11px;
+            border-radius: 4px;
+            border: 1px solid;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .btn-sm:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* ── Empty State ── */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #6e7681;
+        }
+        .empty-icon {
+            font-size: 32px;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 16px;
+            }
+            .filters {
+                flex-direction: column;
+                gap: 16px;
+                align-items: flex-start;
+            }
+            .filters form {
+                width: 100%;
+                flex-wrap: wrap;
+            }
+            .two-col {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
 
 <div class="header">
-    <div>
-        <h2>
-            Pre-Informs Analytics
-            {% if user.zone %}
-                – {{ user.zone.name }}
-            {% else %}
-                – All Zones
-            {% endif %}
-        </h2>
-        <small>
-            Date: {{ selected_date }} &nbsp;·&nbsp;
-            Pure demand forecasting – no booking / no seat reservation
-        </small>
+    <div class="header-left">
+        <div class="header-logo">📋</div>
+        <div>
+            <h2>Pre-Informs Analytics
+                {% if user.zone %}
+                    <span class="zone-badge">{{ user.zone.name }}</span>
+                {% else %}
+                    <span class="zone-badge">All Zones</span>
+                {% endif %}
+            </h2>
+            <small>
+                Date: {{ selected_date }} · Pure demand forecasting – no booking / no seat reservation
+            </small>
+        </div>
     </div>
-    <div class="header-nav">
+    <nav class="header-nav">
         <a href="/zonal-admin/">Dashboard</a>
         <a href="/zonal-admin/schedules/">Schedules</a>
         <a href="/zonal-admin/demand/">Demand Alerts</a>
-    </div>
+    </nav>
 </div>
 
 <div class="container">
@@ -278,66 +438,76 @@
     <div class="two-col">
         <!-- By Route -->
         <div class="card">
-            <div class="section-subtitle" style="margin-bottom:8px;">
-                By Route (sorted by total passengers)
+            <div style="padding: 12px 16px; border-bottom: 1px solid #30363d;">
+                <span class="section-subtitle" style="margin-bottom:0;">By Route (sorted by total passengers)</span>
             </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Route</th>
-                        <th>Passengers</th>
-                        <th>Pre-Informs</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if route_stats %}
-                        {% for r in route_stats %}
+            <div class="table-container">
+                <table>
+                    <thead>
                         <tr>
-                            <td>
-                                <strong>{{ r.route__number }}</strong> – {{ r.route__name }}
-                            </td>
-                            <td>{{ r.total_passengers }}</td>
-                            <td>{{ r.total_preinforms }}</td>
+                            <th>Route</th>
+                            <th>Passengers</th>
+                            <th>Pre-Informs</th>
                         </tr>
-                        {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="3" class="muted">No data for this date.</td>
-                        </tr>
-                    {% endif %}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {% if route_stats %}
+                            {% for r in route_stats %}
+                            <tr>
+                                <td>
+                                    <span class="text-strong">{{ r.route__number }}</span> – {{ r.route__name }}
+                                </td>
+                                <td class="mono">{{ r.total_passengers }}</td>
+                                <td class="mono">{{ r.total_preinforms }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="3" class="empty-state">
+                                    <div class="empty-icon">📊</div>
+                                    <div>No data for this date.</div>
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <!-- By Stop + Time -->
         <div class="card">
-            <div class="section-subtitle" style="margin-bottom:8px;">
-                By Stop &amp; Time (good for spare bus decisions)
+            <div style="padding: 12px 16px; border-bottom: 1px solid #30363d;">
+                <span class="section-subtitle" style="margin-bottom:0;">By Stop & Time (good for spare bus decisions)</span>
             </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Stop</th>
-                        <th>Time</th>
-                        <th>Passengers</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if stop_time_stats %}
-                        {% for s in stop_time_stats %}
+            <div class="table-container">
+                <table>
+                    <thead>
                         <tr>
-                            <td>{{ s.boarding_stop__name }}</td>
-                            <td>{{ s.desired_time|time:"H:i" }}</td>
-                            <td>{{ s.total_passengers }}</td>
+                            <th>Stop</th>
+                            <th>Time</th>
+                            <th>Passengers</th>
                         </tr>
-                        {% endfor %}
-                    {% else %}
-                        <tr>
-                            <td colspan="3" class="muted">No data for this date.</td>
-                        </tr>
-                    {% endif %}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {% if stop_time_stats %}
+                            {% for s in stop_time_stats %}
+                            <tr>
+                                <td>{{ s.boarding_stop__name }}</td>
+                                <td class="mono">{{ s.desired_time|time:"H:i" }}</td>
+                                <td class="mono">{{ s.total_passengers }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="3" class="empty-state">
+                                    <div class="empty-icon">⏰</div>
+                                    <div>No data for this date.</div>
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -348,89 +518,96 @@
     </div>
 
     <div class="card">
-        <table>
-            <thead>
-                <tr>
-                    <th>Time</th>
-                    <th>Passenger</th>
-                    <th>Route</th>
-                    <th>Boarding Stop</th>
-                    <th>Count</th>
-                    <th>Status</th>
-                    <th>Created</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                {% if preinforms %}
-                    {% for p in preinforms %}
+        <div class="table-container">
+            <table>
+                <thead>
                     <tr>
-                        <td>{{ p.desired_time|time:"H:i" }}</td>
-                        <td>
-                            {{ p.user.get_full_name|default:p.user.email }}
-                            <div class="muted">{{ p.user.email }}</div>
-                        </td>
-                        <td>
-                            <span class="pill">
-                                {{ p.route.number }} – {{ p.route.name }}
-                            </span>
-                        </td>
-                        <td>{{ p.boarding_stop.name }}</td>
-                        <td>{{ p.passenger_count }}</td>
-                        <td>
-                            {% if p.status == "pending" %}
-                                <span class="badge badge-pending">Pending</span>
-                            {% elif p.status == "noted" %}
-                                <span class="badge badge-noted">Noted</span>
-                            {% elif p.status == "completed" %}
-                                <span class="badge badge-completed">Completed</span>
-                            {% elif p.status == "cancelled" %}
-                                <span class="badge badge-cancelled">Cancelled</span>
-                            {% else %}
-                                <span class="badge">{{ p.status }}</span>
-                            {% endif %}
-                        </td>
-                        <td>{{ p.created_at|date:"Y-m-d H:i" }}</td>
-                        <td>
-                            {% if p.status == "pending" or p.status == "noted" %}
-                                <!-- Mark as Noted -->
-                                <form method="post"
-                                      action="{% url 'mark-preinform-noted' p.id %}"
-                                      style="display:inline;">
-                                    {% csrf_token %}
-                                    <button type="submit"
-                                            class="btn btn-primary"
-                                            {% if p.status == "noted" %}disabled{% endif %}>
-                                        {% if p.status == "noted" %}
-                                            Noted
-                                        {% else %}
-                                            Mark Noted
-                                        {% endif %}
-                                    </button>
-                                </form>
+                        <th>Time</th>
+                        <th>Passenger</th>
+                        <th>Route</th>
+                        <th>Boarding Stop</th>
+                        <th>Count</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if preinforms %}
+                        {% for p in preinforms %}
+                        <tr>
+                            <td class="mono">{{ p.desired_time|time:"H:i" }}</td>
+                            <td>
+                                <div class="text-strong">{{ p.user.get_full_name|default:p.user.email|truncatechars:15 }}</div>
+                                <div class="muted">{{ p.user.email|truncatechars:20 }}</div>
+                            </td>
+                            <td>
+                                <span class="pill">
+                                    {{ p.route.number }} – {{ p.route.name|truncatechars:15 }}
+                                </span>
+                            </td>
+                            <td>{{ p.boarding_stop.name }}</td>
+                            <td class="mono">{{ p.passenger_count }}</td>
+                            <td>
+                                {% if p.status == "pending" %}
+                                    <span class="badge badge-pending">Pending</span>
+                                {% elif p.status == "noted" %}
+                                    <span class="badge badge-noted">Noted</span>
+                                {% elif p.status == "completed" %}
+                                    <span class="badge badge-completed">Completed</span>
+                                {% elif p.status == "cancelled" %}
+                                    <span class="badge badge-cancelled">Cancelled</span>
+                                {% else %}
+                                    <span class="badge">{{ p.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="mono">{{ p.created_at|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                {% if p.status == "pending" or p.status == "noted" %}
+                                    <div class="action-group">
+                                        <!-- Mark as Noted -->
+                                        <form method="post"
+                                              action="{% url 'mark-preinform-noted' p.id %}"
+                                              style="display:inline;">
+                                            {% csrf_token %}
+                                            <button type="submit"
+                                                    class="btn-sm btn-primary"
+                                                    {% if p.status == "noted" %}disabled{% endif %}>
+                                                {% if p.status == "noted" %}
+                                                    Noted
+                                                {% else %}
+                                                    Mark Noted
+                                                {% endif %}
+                                            </button>
+                                        </form>
 
-                                <!-- Cancel -->
-                                <form method="post"
-                                      action="{% url 'cancel-preinform' p.id %}"
-                                      style="display:inline; margin-left:4px;">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-danger">
-                                        Cancel
-                                    </button>
-                                </form>
-                            {% else %}
-                                <span class="muted">No actions</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% endfor %}
-                {% else %}
-                    <tr>
-                        <td colspan="8" class="muted">No pre-informs for this date in your zone.</td>
-                    </tr>
-                {% endif %}
-            </tbody>
-        </table>
+                                        <!-- Cancel -->
+                                        <form method="post"
+                                              action="{% url 'cancel-preinform' p.id %}"
+                                              style="display:inline;">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn-sm btn-danger">
+                                                Cancel
+                                            </button>
+                                        </form>
+                                    </div>
+                                {% else %}
+                                    <span class="muted">No actions</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="8" class="empty-state">
+                                <div class="empty-icon">📭</div>
+                                <div>No pre-informs for this date in your zone.</div>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
     </div>
 
 </div>

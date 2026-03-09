@@ -3,518 +3,470 @@
 <head>
     <meta charset="UTF-8">
     <title>Demand Alerts - Zonal Admin</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --white: #ffffff;
-            --black: #000000;
-            --gray-50: #fafafa;
-            --gray-100: #f5f5f5;
-            --gray-200: #e5e5e5;
-            --gray-300: #d4d4d4;
-            --gray-400: #a3a3a3;
-            --gray-500: #737373;
-            --gray-600: #525252;
-            --gray-700: #404040;
-            --gray-800: #262626;
-            --gray-900: #171717;
-            
-            --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            --font-mono: 'SF Mono', Monaco, 'Courier New', monospace;
-        }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
+        *, *::before, *::after { box-sizing: border-box; }
+
         body {
-            font-family: var(--font-sans);
-            background: var(--gray-50);
-            color: var(--gray-900);
-            line-height: 1.5;
+            font-family: 'IBM Plex Sans', sans-serif;
+            margin: 0;
+            background: #0d1117;
+            color: #e6edf3;
             min-height: 100vh;
+            line-height: 1.5;
         }
-        
-        /* Header */
+
+        /* ── Header ── */
         .header {
-            background: var(--white);
-            border-bottom: 1px solid var(--gray-200);
-            padding: 1.25rem 2rem;
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             position: sticky;
             top: 0;
             z-index: 100;
         }
-        
-        .header-content {
-            max-width: 1400px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        .header-left { 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
         }
-        
+        .header-logo {
+            width: 32px; 
+            height: 32px;
+            background: #1f6feb;
+            border-radius: 8px;
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            font-size: 16px;
+        }
         .header-title {
-            font-size: 1.75rem;
-            font-weight: 700;
-            letter-spacing: -0.025em;
-            color: var(--black);
+            font-size: 16px;
+            font-weight: 600;
+            color: #e6edf3;
+            letter-spacing: 0.01em;
         }
-        
         .header-subtitle {
-            font-size: 0.875rem;
-            color: var(--gray-500);
-            margin-top: 0.25rem;
+            font-size: 13px;
+            color: #8b949e;
+            margin-left: 8px;
+            display: inline;
         }
-        
         .zone-badge {
             display: inline-block;
-            background: var(--gray-100);
-            color: var(--gray-700);
-            padding: 0.25rem 0.75rem;
-            border-radius: 1rem;
-            font-size: 0.75rem;
+            background: #21262d;
+            color: #8b949e;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
             font-weight: 500;
-            margin-left: 0.5rem;
-            border: 1px solid var(--gray-200);
+            margin-left: 8px;
+            border: 1px solid #30363d;
         }
-        
-        .nav-links {
-            display: flex;
-            gap: 1rem;
+        .header-nav { 
+            display: flex; 
+            gap: 4px; 
         }
-        
-        .nav-link {
+        .header-nav a {
+            color: #8b949e;
             text-decoration: none;
-            color: var(--gray-600);
-            font-size: 0.875rem;
-            font-weight: 500;
-            padding: 0.5rem 1rem;
-            border-radius: 0.375rem;
-            transition: all 0.15s ease;
+            font-size: 13px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            transition: background 0.15s, color 0.15s;
         }
-        
-        .nav-link:hover {
-            background: var(--gray-100);
-            color: var(--gray-900);
+        .header-nav a:hover { 
+            background: #21262d; 
+            color: #e6edf3; 
         }
-        
-        .nav-link.active {
-            background: var(--gray-900);
-            color: var(--white);
+        .header-nav a.active {
+            background: #1f6feb;
+            color: #fff;
         }
-        
-        /* Main Container */
-        .container {
+
+        /* ── Container ── */
+        .container { 
             max-width: 1400px;
-            margin: 2rem auto;
-            padding: 0 2rem;
+            margin: 24px auto;
+            padding: 0 32px; 
         }
-        
-        /* Date Filter */
-        .date-filter {
-            background: var(--white);
-            border: 1px solid var(--gray-200);
-            border-radius: 0.5rem;
-            padding: 1.5rem;
-            margin-bottom: 2rem;
+
+        /* ── Date Filter Card ── */
+        .filter-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 24px;
         }
-        
         .filter-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1.5rem;
+            margin-bottom: 16px;
         }
-        
         .filter-title {
-            font-size: 1.25rem;
+            font-size: 16px;
             font-weight: 600;
-            color: var(--black);
+            color: #e6edf3;
         }
-        
-        .filter-subtitle {
-            font-size: 0.875rem;
-            color: var(--gray-500);
-            margin-top: 0.25rem;
+        .filter-description {
+            font-size: 13px;
+            color: #8b949e;
+            margin-top: 4px;
             max-width: 800px;
         }
-        
         .filter-form {
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: 12px;
         }
-        
+        .filter-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #8b949e;
+        }
         .date-input {
-            padding: 0.625rem 1rem;
-            border: 1px solid var(--gray-300);
-            border-radius: 0.375rem;
-            font-size: 0.875rem;
-            background: var(--white);
-            color: var(--gray-900);
-            font-family: var(--font-sans);
+            background: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 13px;
+            color: #e6edf3;
+            font-family: 'IBM Plex Sans', sans-serif;
             min-width: 200px;
         }
-        
         .date-input:focus {
             outline: none;
-            border-color: var(--gray-400);
+            border-color: #1f6feb;
         }
-        
+        .date-input::-webkit-calendar-picker-indicator {
+            filter: invert(0.8);
+        }
         .apply-btn {
-            background: var(--black);
-            color: var(--white);
-            border: none;
-            padding: 0.625rem 1.5rem;
-            border-radius: 0.375rem;
-            font-size: 0.875rem;
+            background: #238636;
+            color: #fff;
+            border: 1px solid #2ea043;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
             font-weight: 500;
             cursor: pointer;
-            transition: background 0.15s ease;
+            transition: background 0.15s;
         }
-        
         .apply-btn:hover {
-            background: var(--gray-800);
+            background: #2ea043;
         }
-        
-        /* Stats Grid */
+
+        /* ── Stats Grid ── */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
         }
-        
         .stat-card {
-            background: var(--white);
-            border: 1px solid var(--gray-200);
-            border-radius: 0.5rem;
-            padding: 1.5rem;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 20px;
         }
-        
         .stat-header {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 1rem;
+            gap: 12px;
+            margin-bottom: 16px;
         }
-        
         .stat-icon {
-            width: 2.5rem;
-            height: 2.5rem;
-            background: var(--gray-100);
-            border-radius: 0.375rem;
+            width: 40px;
+            height: 40px;
+            background: #21262d;
+            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1rem;
-            color: var(--gray-700);
-            border: 1px solid var(--gray-200);
+            font-size: 18px;
+            color: #8b949e;
+            border: 1px solid #30363d;
         }
-        
         .stat-title {
-            font-size: 0.875rem;
+            font-size: 13px;
             font-weight: 500;
-            color: var(--gray-600);
-        }
-        
-        .stat-value {
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: var(--black);
-            line-height: 1;
-            margin-bottom: 0.5rem;
-        }
-        
-        .stat-desc {
-            font-size: 0.75rem;
-            color: var(--gray-500);
-            border-left: 2px solid var(--gray-300);
-            padding-left: 0.75rem;
-        }
-        
-        /* Alert Level Legend */
-        .legend {
-            background: var(--white);
-            border: 1px solid var(--gray-200);
-            border-radius: 0.5rem;
-            padding: 1.5rem;
-            margin-bottom: 2rem;
-        }
-        
-        .legend-title {
-            font-size: 0.875rem;
-            font-weight: 600;
-            color: var(--gray-700);
-            margin-bottom: 1rem;
+            color: #8b949e;
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
-        
+        .stat-value {
+            font-size: 36px;
+            font-weight: 600;
+            color: #e6edf3;
+            line-height: 1;
+            margin-bottom: 8px;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        .stat-desc {
+            font-size: 12px;
+            color: #6e7681;
+            border-left: 2px solid #30363d;
+            padding-left: 12px;
+        }
+
+        /* ── Legend Card ── */
+        .legend-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+        .legend-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #8b949e;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+        }
         .legend-items {
             display: flex;
             flex-wrap: wrap;
-            gap: 1.5rem;
+            gap: 20px;
         }
-        
         .legend-item {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: 8px;
         }
-        
         .level-badge {
-            padding: 0.25rem 0.75rem;
-            border-radius: 1rem;
-            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            font-size: 11px;
+            border-radius: 999px;
             font-weight: 500;
             border: 1px solid;
         }
-        
         .level-normal {
-            background: var(--gray-100);
-            color: var(--gray-700);
-            border-color: var(--gray-300);
+            background: rgba(110, 118, 129, 0.1);
+            border-color: #30363d;
+            color: #8b949e;
         }
-        
         .level-medium {
-            background: var(--gray-200);
-            color: var(--gray-800);
-            border-color: var(--gray-400);
+            background: rgba(249, 115, 22, 0.1);
+            border-color: rgba(249, 115, 22, 0.3);
+            color: #f97316;
         }
-        
         .level-high {
-            background: var(--gray-300);
-            color: var(--gray-900);
-            border-color: var(--gray-500);
+            background: rgba(248, 81, 73, 0.1);
+            border-color: rgba(248, 81, 73, 0.3);
+            color: #f85149;
         }
-        
         .level-critical {
-            background: var(--gray-900);
-            color: var(--white);
-            border-color: var(--black);
+            background: rgba(248, 81, 73, 0.2);
+            border-color: #f85149;
+            color: #f85149;
+            font-weight: 600;
         }
-        
-        /* Alert Sections */
+
+        /* ── Alert Section Card ── */
         .alert-section {
-            background: var(--white);
-            border: 1px solid var(--gray-200);
-            border-radius: 0.5rem;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
             overflow: hidden;
-            margin-bottom: 2rem;
+            margin-bottom: 24px;
         }
-        
         .section-header {
-            padding: 1.5rem;
-            border-bottom: 1px solid var(--gray-200);
-            background: var(--gray-50);
+            padding: 16px 20px;
+            border-bottom: 1px solid #30363d;
+            background: #0d1117;
         }
-        
         .section-title {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            font-size: 1.125rem;
+            gap: 8px;
+            font-size: 14px;
             font-weight: 600;
-            color: var(--black);
-            margin-bottom: 0.5rem;
+            color: #e6edf3;
+            margin-bottom: 4px;
         }
-        
         .section-subtitle {
-            font-size: 0.875rem;
-            color: var(--gray-600);
+            font-size: 12px;
+            color: #8b949e;
         }
-        
+        .text-strong {
+            color: #e6edf3;
+            font-weight: 500;
+        }
+
+        /* ── Table Styles ── */
         .table-container {
             overflow-x: auto;
         }
-        
         .alert-table {
             width: 100%;
             border-collapse: collapse;
             min-width: 1000px;
         }
-        
         .alert-table thead {
-            background: var(--gray-50);
-            border-bottom: 1px solid var(--gray-200);
+            background: #0d1117;
+            border-bottom: 1px solid #30363d;
         }
-        
         .alert-table th {
-            padding: 1rem 1.25rem;
+            padding: 12px 16px;
             text-align: left;
-            font-size: 0.75rem;
+            font-size: 11px;
             font-weight: 600;
-            color: var(--gray-600);
             text-transform: uppercase;
             letter-spacing: 0.05em;
+            color: #8b949e;
             white-space: nowrap;
         }
-        
         .alert-table tbody tr {
-            border-bottom: 1px solid var(--gray-200);
-            transition: background 0.15s ease;
+            border-bottom: 1px solid #21262d;
+            transition: background 0.15s;
         }
-        
         .alert-table tbody tr:hover {
-            background: var(--gray-50);
+            background: #1c2128;
         }
-        
         .alert-table td {
-            padding: 1rem 1.25rem;
-            font-size: 0.875rem;
-            color: var(--gray-900);
-            vertical-align: top;
+            padding: 12px 16px;
+            font-size: 13px;
+            color: #c9d1d9;
+            vertical-align: middle;
         }
-        
-        /* Status Badges */
+
+        /* ── Status Badges ── */
         .status-badge {
-            padding: 0.375rem 0.75rem;
-            border-radius: 1rem;
-            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            font-size: 11px;
+            border-radius: 999px;
             font-weight: 500;
             border: 1px solid;
-            display: inline-block;
         }
-        
         .status-reported {
-            background: var(--gray-100);
-            color: var(--gray-700);
-            border-color: var(--gray-300);
+            background: rgba(110, 118, 129, 0.1);
+            border-color: #30363d;
+            color: #8b949e;
         }
-        
         .status-verified {
-            background: var(--gray-200);
-            color: var(--gray-800);
-            border-color: var(--gray-400);
+            background: rgba(249, 115, 22, 0.1);
+            border-color: rgba(249, 115, 22, 0.3);
+            color: #f97316;
         }
-        
         .status-dispatched {
-            background: var(--gray-300);
-            color: var(--gray-900);
-            border-color: var(--gray-500);
+            background: rgba(31, 111, 235, 0.1);
+            border-color: rgba(31, 111, 235, 0.3);
+            color: #1f6feb;
         }
-        
         .status-resolved {
-            background: var(--gray-100);
-            color: var(--gray-600);
-            border-color: var(--gray-300);
+            background: rgba(63, 185, 80, 0.1);
+            border-color: rgba(63, 185, 80, 0.3);
+            color: #3fb950;
         }
-        
         .status-expired {
-            background: var(--gray-50);
-            color: var(--gray-500);
-            border-color: var(--gray-200);
+            background: rgba(110, 118, 129, 0.05);
+            border-color: #21262d;
+            color: #6e7681;
         }
-        
-        /* Action Buttons */
+
+        /* ── Action Buttons ── */
         .action-btn {
-            padding: 0.5rem 1rem;
-            border-radius: 0.375rem;
-            font-size: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
             font-weight: 500;
             text-decoration: none;
-            display: inline-block;
             border: 1px solid;
             cursor: pointer;
-            transition: all 0.15s ease;
+            transition: all 0.15s;
         }
-        
         .btn-dispatch {
-            background: var(--black);
-            color: var(--white);
-            border-color: var(--black);
+            background: #238636;
+            color: #fff;
+            border-color: #2ea043;
         }
-        
         .btn-dispatch:hover {
-            background: var(--gray-800);
-            border-color: var(--gray-800);
+            background: #2ea043;
         }
-        
         .btn-dispatched {
-            background: var(--gray-300);
-            color: var(--gray-900);
-            border-color: var(--gray-400);
+            background: #21262d;
+            color: #8b949e;
+            border-color: #30363d;
             cursor: default;
         }
-        
         .btn-monitor {
-            background: var(--gray-100);
-            color: var(--gray-600);
-            border-color: var(--gray-300);
+            background: #21262d;
+            color: #8b949e;
+            border-color: #30363d;
             cursor: default;
         }
-        
-        /* Text Helpers */
+
+        /* ── Text Utilities ── */
         .text-muted {
-            color: var(--gray-500);
-            font-size: 0.75rem;
+            color: #6e7681;
+            font-size: 11px;
         }
-        
-        .text-strong {
-            font-weight: 600;
-            color: var(--gray-900);
+        .mono {
+            font-family: 'IBM Plex Mono', monospace;
         }
-        
         .nowrap {
             white-space: nowrap;
         }
-        
-        /* Empty State */
+
+        /* ── Empty State ── */
         .empty-state {
-            padding: 3rem 1.5rem;
+            padding: 48px 24px;
             text-align: center;
-            color: var(--gray-500);
+            color: #6e7681;
         }
-        
         .empty-icon {
-            font-size: 2rem;
-            margin-bottom: 1rem;
+            font-size: 32px;
+            margin-bottom: 12px;
             opacity: 0.5;
         }
-        
         .empty-text {
-            font-size: 0.875rem;
+            font-size: 14px;
         }
-        
-        /* Responsive */
+
+        /* ── Responsive ── */
         @media (max-width: 768px) {
             .container {
-                padding: 0 1rem;
+                padding: 0 16px;
             }
-            
             .header {
-                padding: 1rem;
-            }
-            
-            .header-content {
+                padding: 12px 16px;
                 flex-direction: column;
-                gap: 1rem;
+                gap: 12px;
                 align-items: flex-start;
             }
-            
-            .nav-links {
+            .header-nav {
                 width: 100%;
                 justify-content: space-between;
             }
-            
             .filter-header {
                 flex-direction: column;
                 align-items: flex-start;
-                gap: 1rem;
+                gap: 12px;
             }
-            
             .filter-form {
                 width: 100%;
                 flex-direction: column;
                 align-items: stretch;
             }
-            
             .date-input {
                 width: 100%;
             }
-            
             .apply-btn {
                 width: 100%;
             }
@@ -524,41 +476,43 @@
 <body>
     <!-- Header -->
     <header class="header">
-        <div class="header-content">
+        <div class="header-left">
+            <div class="header-logo">📊</div>
             <div>
-                <h1 class="header-title">Demand Alerts</h1>
-                <div class="header-subtitle">
-                    Auto-generated from <span class="text-strong">NOTED</span> pre-informs and live bus load predictions
+                <span class="header-title">Demand Alerts</span>
+                <span class="header-subtitle">
+                    Auto-generated from NOTED pre-informs and live bus load predictions
                     {% if user.zone %}
                         <span class="zone-badge">{{ user.zone.name }}</span>
                     {% endif %}
-                </div>
+                </span>
             </div>
-            <nav class="nav-links">
-                <a href="/zonal-admin/" class="nav-link">Dashboard</a>
-                <a href="/zonal-admin/preinforms/" class="nav-link">Pre-Informs</a>
-                <a href="/zonal-admin/schedules/" class="nav-link">Schedules</a>
-            </nav>
         </div>
+        <nav class="header-nav">
+            <a href="/zonal-admin/" class="nav-link">Dashboard</a>
+            <a href="/zonal-admin/preinforms/" class="nav-link">Pre-Informs</a>
+            <a href="/zonal-admin/schedules/" class="nav-link">Schedules</a>
+            <a href="/zonal-admin/demand/" class="nav-link active">Demand</a>
+        </nav>
     </header>
 
     <!-- Main Content -->
     <main class="container">
-        <!-- Date Filter -->
-        <div class="date-filter">
+        <!-- Date Filter Card -->
+        <div class="filter-card">
             <div class="filter-header">
                 <div>
-                    <h2 class="filter-title">Live Demand Alerts</h2>
-                    <p class="filter-subtitle">
+                    <div class="filter-title">Live Demand Alerts</div>
+                    <div class="filter-description">
                         Showing alerts for <span class="text-strong">{{ selected_date|date:"Y-m-d" }}</span>. 
                         Top section shows <span class="text-strong">people waiting at stops</span>. 
                         Bottom section shows <span class="text-strong">people inside buses after each stop</span>.
                         For <span class="text-strong">High / Critical</span> predictions, you can dispatch a spare bus.
-                    </p>
+                    </div>
                 </div>
             </div>
             <form method="get" class="filter-form">
-                <label for="date" style="font-size: 0.875rem; font-weight: 500; color: var(--gray-700);">Date:</label>
+                <span class="filter-label">Date:</span>
                 <input 
                     type="date"
                     id="date"
@@ -566,7 +520,7 @@
                     value="{{ selected_date|date:'Y-m-d' }}"
                     class="date-input"
                 >
-                <button type="submit" class="apply-btn">Apply</button>
+                <button type="submit" class="apply-btn">Apply Filter</button>
             </form>
         </div>
 
@@ -574,10 +528,8 @@
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-header">
-                    <div class="stat-icon">P</div>
-                    <div>
-                        <div class="stat-title">Pre-Inform Alerts</div>
-                    </div>
+                    <div class="stat-icon">📋</div>
+                    <div class="stat-title">Pre-Inform Alerts</div>
                 </div>
                 <div class="stat-value">{{ preinform_alerts|length }}</div>
                 <div class="stat-desc">
@@ -586,10 +538,8 @@
             </div>
             <div class="stat-card">
                 <div class="stat-header">
-                    <div class="stat-icon">B</div>
-                    <div>
-                        <div class="stat-title">Prediction Alerts</div>
-                    </div>
+                    <div class="stat-icon">🚌</div>
+                    <div class="stat-title">Prediction Alerts</div>
                 </div>
                 <div class="stat-value">{{ prediction_alerts|length }}</div>
                 <div class="stat-desc">
@@ -599,7 +549,7 @@
         </div>
 
         <!-- Alert Level Legend -->
-        <div class="legend">
+        <div class="legend-card">
             <div class="legend-title">Alert Level Guide</div>
             <div class="legend-items">
                 <div class="legend-item">
@@ -626,7 +576,7 @@
             <div class="section-header">
                 <div>
                     <div class="section-title">
-                        <span>Stop Demand from NOTED Pre-Informs</span>
+                        <span>📋 Stop Demand from NOTED Pre-Informs</span>
                     </div>
                     <div class="section-subtitle">
                         People = passengers who plan to <span class="text-strong">board at that stop</span>
@@ -651,7 +601,7 @@
                             {% for alert in preinform_alerts %}
                                 {% with level=alert.get_level %}
                                 <tr>
-                                    <td class="nowrap">{{ forloop.counter }}</td>
+                                    <td class="nowrap mono">{{ forloop.counter }}</td>
                                     <td>
                                         <div class="text-strong">{{ alert.stop.name }}</div>
                                         <div class="text-muted">Stop #{{ alert.stop.sequence }}</div>
@@ -659,13 +609,13 @@
                                     <td>
                                         {% if alert.stop.route %}
                                             <div class="text-strong">{{ alert.stop.route.number }}</div>
-                                            <div class="text-muted">{{ alert.stop.route.name }}</div>
+                                            <div class="text-muted">{{ alert.stop.route.name|truncatechars:15 }}</div>
                                         {% else %}
                                             <span class="text-muted">No route assigned</span>
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <div class="text-strong">{{ alert.number_of_people }}</div>
+                                        <div class="text-strong mono">{{ alert.number_of_people }}</div>
                                         <div class="text-muted">passengers</div>
                                     </td>
                                     <td>
@@ -679,7 +629,7 @@
                                         </span>
                                     </td>
                                     <td class="nowrap">
-                                        <div>{{ alert.created_at|date:"H:i" }}</div>
+                                        <div class="mono">{{ alert.created_at|date:"H:i" }}</div>
                                         <div class="text-muted">{{ alert.created_at|date:"Y-m-d" }}</div>
                                     </td>
                                 </tr>
@@ -689,7 +639,7 @@
                     </table>
                 {% else %}
                     <div class="empty-state">
-                        <div class="empty-icon">—</div>
+                        <div class="empty-icon">📭</div>
                         <div class="empty-text">No pre-inform alerts for this date.</div>
                     </div>
                 {% endif %}
@@ -701,7 +651,7 @@
             <div class="section-header">
                 <div>
                     <div class="section-title">
-                        <span>Bus Overflow Predictions</span>
+                        <span>🚌 Bus Overflow Predictions</span>
                     </div>
                     <div class="section-subtitle">
                         Expected load = passengers <span class="text-strong">inside bus after this stop</span>
@@ -729,28 +679,28 @@
                                 {% with level=alert.level %}
                                 {% with schedule=alert.bus_schedule %}
                                 <tr>
-                                    <td class="nowrap">{{ forloop.counter }}</td>
+                                    <td class="nowrap mono">{{ forloop.counter }}</td>
                                     <td>
                                         <div class="text-strong">{{ alert.alert.stop.name }}</div>
                                         <div class="text-muted">Stop #{{ alert.alert.stop.sequence }}</div>
                                     </td>
                                     <td>
                                         <div class="text-strong">{{ alert.alert.stop.route.number }}</div>
-                                        <div class="text-muted">{{ alert.alert.stop.route.name }}</div>
+                                        <div class="text-muted">{{ alert.alert.stop.route.name|truncatechars:12 }}</div>
                                     </td>
                                     <td>
                                         {% if schedule %}
-                                            <div class="text-strong">{{ schedule.bus.number_plate }}</div>
+                                            <div class="text-strong mono">{{ schedule.bus.number_plate }}</div>
                                             <div class="text-muted">
                                                 Stop #{{ schedule.current_stop_sequence|default:"—" }}
-                                                · Load: {{ schedule.current_passengers|default:0 }}/{{ schedule.bus.capacity }}
+                                                · Load: <span class="mono">{{ schedule.current_passengers|default:0 }}/{{ schedule.bus.capacity }}</span>
                                             </div>
                                         {% else %}
                                             <span class="text-muted">No running bus found</span>
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <div class="text-strong">{{ alert.alert.number_of_people }}</div>
+                                        <div class="text-strong mono">{{ alert.alert.number_of_people }}</div>
                                         {% if schedule %}
                                             <div class="text-muted">of {{ schedule.bus.capacity }} capacity</div>
                                         {% endif %}
@@ -766,18 +716,17 @@
                                         </span>
                                     </td>
                                     <td class="nowrap">
-                                        <div>{{ alert.alert.created_at|date:"H:i" }}</div>
+                                        <div class="mono">{{ alert.alert.created_at|date:"H:i" }}</div>
                                         <div class="text-muted">{{ alert.alert.created_at|date:"Y-m-d" }}</div>
                                     </td>
                                     <td>
-                                        <!-- 🔥 CHECK IF SPARE BUS ALREADY DISPATCHED FOR THIS ROUTE -->
                                         {% if alert.alert.status == 'dispatched' %}
                                             <span class="action-btn btn-dispatched">
-                                                Bus Dispatched
+                                                ✓ Dispatched
                                             </span>
                                         {% elif level == 'high' or level == 'critical' %}
                                             <a href="{% url 'zonal-dispatch-spare' alert.alert.id %}" class="action-btn btn-dispatch">
-                                                Dispatch
+                                                Dispatch Spare
                                             </a>
                                         {% else %}
                                             <span class="action-btn btn-monitor">
@@ -793,7 +742,7 @@
                     </table>
                 {% else %}
                     <div class="empty-state">
-                        <div class="empty-icon">—</div>
+                        <div class="empty-icon">🚌</div>
                         <div class="empty-text">No overflow predictions for this date.</div>
                     </div>
                 {% endif %}
@@ -802,7 +751,6 @@
     </main>
 
     <script>
-        // Simple script to enhance the date input
         document.addEventListener('DOMContentLoaded', function() {
             const dateInput = document.getElementById('date');
             
@@ -811,17 +759,6 @@
                 const today = new Date().toISOString().split('T')[0];
                 dateInput.value = today;
             }
-            
-            // Add subtle hover effect to table rows
-            const tableRows = document.querySelectorAll('.alert-table tbody tr');
-            tableRows.forEach(row => {
-                row.addEventListener('mouseenter', function() {
-                    this.style.backgroundColor = 'var(--gray-50)';
-                });
-                row.addEventListener('mouseleave', function() {
-                    this.style.backgroundColor = '';
-                });
-            });
         });
     </script>
 </body>

@@ -3,90 +3,304 @@
 <head>
     <meta charset="UTF-8">
     <title>Route Management – Zonal Admin</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; background: #eef1f7; }
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+            font-family: 'IBM Plex Sans', sans-serif;
+            margin: 0;
+            background: #0d1117;
+            color: #e6edf3;
+            min-height: 100vh;
+        }
+
+        /* ── Header ── */
         .header {
-            background: #004aad; padding: 18px 30px; color: white;
-            display: flex; justify-content: space-between; align-items: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-        .header h2 { margin: 0; }
-        .header a { color: #dbe7ff; text-decoration: none; margin-left: 16px; font-size: 14px; }
-        .container { width: 90%; margin: 25px auto 40px; }
+        .header-left { 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+        }
+        .header-logo {
+            width: 32px; 
+            height: 32px;
+            background: #1f6feb;
+            border-radius: 8px;
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            font-size: 16px;
+        }
+        .header h2 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: #e6edf3;
+            letter-spacing: 0.01em;
+        }
+        .zone-badge {
+            display: inline-block;
+            background: #21262d;
+            color: #8b949e;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+            margin-left: 8px;
+            border: 1px solid #30363d;
+        }
+        .header-nav { 
+            display: flex; 
+            gap: 4px; 
+        }
+        .header-nav a {
+            color: #8b949e;
+            text-decoration: none;
+            font-size: 13px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            transition: background 0.15s, color 0.15s;
+        }
+        .header-nav a:hover { 
+            background: #21262d; 
+            color: #e6edf3; 
+        }
+
+        /* ── Container ── */
+        .container { 
+            max-width: 1400px;
+            margin: 24px auto;
+            padding: 0 32px; 
+        }
+
+        /* ── Card ── */
         .card {
-            background: #ffffff; padding: 18px 20px; border-radius: 10px;
-            box-shadow: 0px 3px 8px rgba(0,0,0,0.12);
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            overflow: hidden;
         }
+
+        .card-header {
+            padding: 14px 20px;
+            border-bottom: 1px solid #30363d;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .card-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #8b949e;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
         .btn-primary {
-            display: inline-block; padding: 8px 16px; background: #0275d8;
-            color: white; border-radius: 6px; text-decoration: none; font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            background: #238636;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 500;
+            border: 1px solid #2ea043;
+            transition: background 0.15s;
         }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th { background: #dfe4ea; padding: 10px; text-align: left; font-size: 13px; }
-        td { padding: 9px 10px; border-bottom: 1px solid #e3e3e3; font-size: 13px; }
+        .btn-primary:hover { background: #2ea043; }
+
+        /* ── Table ── */
+        .table-container {
+            overflow-x: auto;
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+        }
+        th {
+            background: #0d1117;
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #8b949e;
+            border-bottom: 1px solid #30363d;
+            white-space: nowrap;
+        }
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #21262d;
+            font-size: 13px;
+            color: #c9d1d9;
+            vertical-align: middle;
+            white-space: nowrap;
+        }
+        tbody tr {
+            transition: background 0.15s;
+        }
+        tbody tr:hover td { 
+            background: #1c2128; 
+        }
+
+        /* ── Badge ── */
         .badge {
-            padding: 3px 8px; border-radius: 999px; font-size: 11px;
-            background: #e5e7eb; color: #374151;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            font-size: 11px;
+            border-radius: 999px;
+            font-weight: 500;
+            border: 1px solid;
+            background: #21262d;
+            border-color: #30363d;
+            color: #8b949e;
+        }
+        .badge-number {
+            font-family: 'IBM Plex Mono', monospace;
+            color: #e6edf3;
+            margin-right: 2px;
+        }
+
+        /* ── Text Utilities ── */
+        .mono {
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        .text-strong {
+            font-weight: 600;
+            color: #e6edf3;
+        }
+        .text-muted {
+            color: #6e7681;
+            font-size: 12px;
+        }
+
+        /* ── Link Styles ── */
+        .action-link {
+            color: #79c0ff;
+            text-decoration: none;
+            font-size: 13px;
+            transition: color 0.15s;
+        }
+        .action-link:hover {
+            color: #58a6ff;
+            text-decoration: underline;
+        }
+
+        /* ── Route Origin-Destination Arrow ── */
+        .route-arrow {
+            color: #6e7681;
+            margin: 0 4px;
+        }
+
+        /* ── Empty State ── */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #6e7681;
+        }
+        .empty-icon {
+            font-size: 32px;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+        .empty-text {
+            font-size: 14px;
         }
     </style>
 </head>
 <body>
 
 <div class="header">
-    <h2>Route Management – {{ user.zone.name|default:"All Zones" }}</h2>
-    <div>
+    <div class="header-left">
+        <div class="header-logo">🛣️</div>
+        <h2>Route Management
+            {% if user.zone %}
+                <span class="zone-badge">{{ user.zone.name }}</span>
+            {% endif %}
+        </h2>
+    </div>
+    <nav class="header-nav">
         <a href="/zonal-admin/">Dashboard</a>
         <a href="/zonal-admin/buses/">Buses</a>
         <a href="/zonal-admin/schedules/">Schedules</a>
-       
-    </div>
+    </nav>
 </div>
 
 <div class="container">
     <div class="card">
-        <a href="{% url 'add-route' %}" class="btn-primary">+ Add New Route</a>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Route No</th>
-                    <th>Name</th>
-                    <th>Origin → Destination</th>
-                    <th>Distance</th>
-                    <th>Duration</th>
-                    <th>Stops</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for route in routes %}
-                <tr>
-                    <td><strong>{{ route.number }}</strong></td>
-                    <td>{{ route.name }}</td>
-                    <td>{{ route.origin }} → {{ route.destination }}</td>
-                    <td>{{ route.total_distance }} km</td>
-                    <td>{{ route.duration }} hrs</td>
-                    <td>
-                        <span class="badge">
-                            {{ route.stop_count }} stop{% if route.stop_count != 1 %}s{% endif %}
-                        </span>
-                    </td>
-                    <td>
-                        <a href="{% url 'edit-route' route.id %}" 
-                           style="color: #2563eb; text-decoration: none; font-size: 13px;">
-                            Edit
-                        </a>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="7" style="text-align: center; color: #6b7280; padding: 20px;">
-                        No routes found. Add your first route above.
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div class="card-header">
+            <span class="card-title">Route List</span>
+            <a href="{% url 'add-route' %}" class="btn-primary">+ Add New Route</a>
+        </div>
+        
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Route No</th>
+                        <th>Name</th>
+                        <th>Origin → Destination</th>
+                        <th>Distance</th>
+                        <th>Duration</th>
+                        <th>Stops</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for route in routes %}
+                    <tr>
+                        <td>
+                            <span class="text-strong mono">{{ route.number }}</span>
+                        </td>
+                        <td>{{ route.name }}</td>
+                        <td>
+                            <span class="mono">{{ route.origin }}</span>
+                            <span class="route-arrow">→</span>
+                            <span class="mono">{{ route.destination }}</span>
+                        </td>
+                        <td>
+                            <span class="mono">{{ route.total_distance }}</span> km
+                        </td>
+                        <td>
+                            <span class="mono">{{ route.duration }}</span> hrs
+                        </td>
+                        <td>
+                            <span class="badge">
+                                <span class="badge-number">{{ route.stop_count }}</span>
+                                stop{% if route.stop_count != 1 %}s{% endif %}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{% url 'edit-route' route.id %}" class="action-link">
+                                Edit
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="empty-state">
+                            <div class="empty-icon">🛣️</div>
+                            <div class="empty-text">No routes found. Add your first route above.</div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
