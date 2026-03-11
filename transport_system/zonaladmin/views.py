@@ -1546,12 +1546,13 @@ def generate_week_schedules(request):
 
     week_end = week_start + timedelta(days=6)
 
-    # Check existing
+    # Check existing schedules
     existing = Schedule.objects.filter(
         date__gte=week_start,
         date__lte=week_end
     ).count()
 
+    # If schedules exist and user didn't check "replace", show warning
     if existing > 0 and not force_replace:
         messages.warning(
             request,
@@ -1561,29 +1562,58 @@ def generate_week_schedules(request):
         return redirect("schedule-generator")
 
     try:
-        from django.core.management import call_command
-        from io import StringIO
-        out = StringIO()
-        call_command(
+        # Import subprocess
+        import subprocess
+        import sys
+        import os
+        
+        # Build command
+        cmd = [
+            sys.executable,
+            'manage.py',
             'create_balanced_schedules',
-            week_start=str(week_start),
-            clear_existing=force_replace,
-            stdout=out
+            f'--week-start={week_start}',
+            '--clear-existing'  # ALWAYS use this flag
+        ]
+        
+        # Set environment
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+        
+        # Run command
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=env,
+            encoding='utf-8',
+            errors='replace'
         )
+        
+        # Count created schedules
         new_count = Schedule.objects.filter(
             date__gte=week_start,
             date__lte=week_end
         ).count()
-        messages.success(
-            request,
-            f"✅ Generated {new_count} schedules for {week_label} "
-            f"({week_start} to {week_end})!"
-        )
+        
+        if result.returncode == 0 and new_count > 0:
+            messages.success(
+                request,
+                f"✅ Generated {new_count} schedules for {week_label}!"
+            )
+        elif new_count == 0:
+            messages.error(
+                request,
+                f"❌ Command ran but created 0 schedules. Output: {result.stdout[:200]}"
+            )
+        else:
+            messages.error(request, f"❌ Error: {result.stderr[:500]}")
+            
     except Exception as e:
         messages.error(request, f"❌ Error: {str(e)}")
 
     return redirect("schedule-generator")
-
 
 @login_required
 def calculate_week_profits(request):

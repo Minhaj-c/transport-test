@@ -149,8 +149,9 @@ class Command(BaseCommand):
         
         # 2. Count passengers (total_seats - available_seats)
         total_passengers = sum(
-            s.total_seats - s.available_seats 
+            s.current_passengers 
             for s in schedules
+            
         )
         
         # 3. Calculate revenue
