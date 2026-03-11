@@ -63,6 +63,54 @@
             padding: 0 32px; 
         }
 
+        /* ── Week Selector ── */
+        .week-selector {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .week-selector label {
+            font-size: 13px;
+            color: #8b949e;
+            font-weight: 500;
+        }
+        .week-selector input[type="date"] {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: #e6edf3;
+            font-size: 13px;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        .week-selector input[type="date"]:focus {
+            outline: none;
+            border-color: #1f6feb;
+        }
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            border: 1px solid;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .btn-primary {
+            background: #1f6feb;
+            border-color: #388bfd;
+            color: #fff;
+        }
+        .btn-primary:hover {
+            background: #388bfd;
+        }
+
         /* ── Alerts ── */
         .alert {
             padding: 16px 20px;
@@ -75,10 +123,10 @@
             border-color: rgba(31, 111, 235, 0.3);
             color: #79c0ff;
         }
-        .alert-success {
-            background: rgba(63, 185, 80, 0.1);
-            border-color: rgba(63, 185, 80, 0.3);
-            color: #3fb950;
+        .alert-warning {
+            background: rgba(249, 115, 22, 0.1);
+            border-color: rgba(249, 115, 22, 0.3);
+            color: #f97316;
         }
         .alert strong {
             color: #e6edf3;
@@ -129,9 +177,6 @@
             display: flex;
             align-items: center;
             gap: 8px;
-        }
-        .rotation-icon {
-            font-size: 18px;
         }
 
         /* ── Table Styles ── */
@@ -188,18 +233,9 @@
             font-size: 11px;
             font-weight: 600;
         }
-        .rank-1 { 
-            background: #fbbf24; 
-            color: #000; 
-        }
-        .rank-2 { 
-            background: #9ca3af; 
-            color: #fff; 
-        }
-        .rank-3 { 
-            background: #cd7f32; 
-            color: #fff; 
-        }
+        .rank-1 { background: #fbbf24; color: #000; }
+        .rank-2 { background: #9ca3af; color: #fff; }
+        .rank-3 { background: #cd7f32; color: #fff; }
 
         /* ── Badges ── */
         .badge {
@@ -231,15 +267,6 @@
             color: #e6edf3;
             font-weight: 500;
         }
-        code {
-            background: #21262d;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 12px;
-            color: #79c0ff;
-            border: 1px solid #30363d;
-        }
 
         /* ── Responsive ── */
         @media (max-width: 768px) {
@@ -266,26 +293,45 @@
 
 <div class="container">
     
+    <!-- Week Selector -->
+    <div class="week-selector">
+        <label for="week_start">📅 Select Week (Monday):</label>
+        <form method="GET" style="display: flex; gap: 12px; align-items: center;">
+            <input 
+                type="date" 
+                id="week_start" 
+                name="week_start" 
+                value="{{ week_start }}"
+                required
+            >
+            <button type="submit" class="btn btn-primary">View Week</button>
+        </form>
+    </div>
+
     {% if no_data %}
     <div class="card">
-        <div class="alert alert-info">
-            <strong>ℹ️ No Data Available</strong>
+        <div class="alert alert-warning">
+            <strong>⚠️ No Profit Data for This Week</strong>
             {{ message }}
+            <br><br>
+            To calculate profits for this week, go to the <a href="/zonal-admin/schedule-generator/" style="color:#79c0ff;">Schedule Generator</a> and click "Calculate Profit".
         </div>
     </div>
     {% else %}
     
     <!-- Week Info -->
     <div class="alert alert-info">
-        <strong>📅 Week: {{ week_start }} to {{ week_end }}</strong>
-        7 days
+        <strong>📅 Viewing Week: {{ week_start }} to {{ week_end }}</strong>
+        Profit data calculated for 7 days
     </div>
     
     <!-- Summary Stats -->
     <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-label">Total Zone Profit</div>
-            <div class="stat-value">₹{{ total_profit|floatformat:0 }}</div>
+            <div class="stat-value" style="color: {% if total_profit >= 0 %}#3fb950{% else %}#f85149{% endif %}">
+                ₹{{ total_profit|floatformat:0 }}
+            </div>
         </div>
         
         <div class="stat-card">
@@ -295,7 +341,9 @@
         
         <div class="stat-card">
             <div class="stat-label">Average Profit/Bus</div>
-            <div class="stat-value">₹{{ avg_profit_per_bus|floatformat:0 }}</div>
+            <div class="stat-value" style="color: {% if avg_profit_per_bus >= 0 %}#3fb950{% else %}#f85149{% endif %}">
+                ₹{{ avg_profit_per_bus|floatformat:0 }}
+            </div>
         </div>
         
         <div class="stat-card">
@@ -303,126 +351,6 @@
             <div class="stat-value">{{ bus_count }}</div>
         </div>
     </div>
-    
-    <!-- Top Performers -->
-    <div class="card">
-        <h3 class="card-title">🏆 Top 5 Performers (This Week)</h3>
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Rank</th>
-                        <th>Bus</th>
-                        <th>Trips</th>
-                        <th>Passengers</th>
-                        <th>Revenue</th>
-                        <th>Fuel Cost</th>
-                        <th>Profit</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for perf in top_5 %}
-                    <tr>
-                        <td>
-                            <span class="rank-badge rank-{{ perf.profit_rank }}">
-                                {{ perf.profit_rank }}
-                            </span>
-                        </td>
-                        <td><span class="text-strong">{{ perf.bus.number_plate }}</span></td>
-                        <td class="mono">{{ perf.total_trips }}</td>
-                        <td class="mono">{{ perf.total_passengers }}</td>
-                        <td class="mono">₹{{ perf.total_revenue|floatformat:0 }}</td>
-                        <td class="mono">₹{{ perf.total_fuel_cost|floatformat:0 }}</td>
-                        <td class="profit-positive">₹{{ perf.total_profit|floatformat:0 }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    
-    <!-- Bottom Performers -->
-    <div class="card">
-        <h3 class="card-title">📉 Bottom 5 Performers (This Week)</h3>
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Rank</th>
-                        <th>Bus</th>
-                        <th>Trips</th>
-                        <th>Passengers</th>
-                        <th>Revenue</th>
-                        <th>Fuel Cost</th>
-                        <th>Profit</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for perf in bottom_5 %}
-                    <tr>
-                        <td>
-                            <span class="rank-badge">{{ perf.profit_rank }}</span>
-                        </td>
-                        <td><span class="text-strong">{{ perf.bus.number_plate }}</span></td>
-                        <td class="mono">{{ perf.total_trips }}</td>
-                        <td class="mono">{{ perf.total_passengers }}</td>
-                        <td class="mono">₹{{ perf.total_revenue|floatformat:0 }}</td>
-                        <td class="mono">₹{{ perf.total_fuel_cost|floatformat:0 }}</td>
-                        <td class="profit-negative">₹{{ perf.total_profit|floatformat:0 }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    
-    <!-- Next Week Assignments -->
-    {% if has_next_week %}
-    <div class="card">
-        <h3 class="card-title">
-            <span class="rotation-icon">🔄</span>
-            Next Week Assignments ({{ next_week_start }})
-        </h3>
-        
-        <div class="alert alert-success" style="margin-bottom: 16px;">
-            <strong>✅ Fair Rotation Active!</strong>
-            Low-profit buses from this week have been assigned to high-profit routes next week.
-        </div>
-        
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Bus</th>
-                        <th>Assigned Route</th>
-                        <th>Expected Profit</th>
-                        <th>Assignment Reason</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for assignment in next_assignments %}
-                    <tr>
-                        <td><span class="text-strong">{{ assignment.bus.number_plate }}</span></td>
-                        <td>Route {{ assignment.route.number }} – {{ assignment.route.name }}</td>
-                        <td class="mono profit-positive">₹{{ assignment.expected_profit|floatformat:0 }}</td>
-                        <td>
-                            <span class="text-muted" style="color: #8b949e;">
-                                {{ assignment.assignment_reason }}
-                            </span>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    {% else %}
-    <div class="card">
-        <div class="alert alert-info">
-            <strong>📋 Next Week Schedule Not Generated Yet</strong>
-        </div>
-    </div>
-    {% endif %}
     
     <!-- All Buses Performance -->
     <div class="card">
@@ -435,6 +363,8 @@
                         <th>Bus</th>
                         <th>Trips</th>
                         <th>Passengers</th>
+                        <th>Revenue</th>
+                        <th>Fuel Cost</th>
                         <th>Profit</th>
                         <th>Status</th>
                     </tr>
@@ -442,24 +372,34 @@
                 <tbody>
                     {% for perf in performances %}
                     <tr>
-                        <td class="mono">{{ perf.profit_rank }}</td>
+                        <td>
+                            {% if perf.profit_rank <= 3 %}
+                            <span class="rank-badge rank-{{ perf.profit_rank }}">
+                                {{ perf.profit_rank }}
+                            </span>
+                            {% else %}
+                            <span class="mono">{{ perf.profit_rank }}</span>
+                            {% endif %}
+                        </td>
                         <td><span class="text-strong">{{ perf.bus.number_plate }}</span></td>
                         <td class="mono">{{ perf.total_trips }}</td>
                         <td class="mono">{{ perf.total_passengers }}</td>
+                        <td class="mono">₹{{ perf.total_revenue|floatformat:0 }}</td>
+                        <td class="mono">₹{{ perf.total_fuel_cost|floatformat:0 }}</td>
                         <td>
-                            {% if perf.total_profit > 0 %}
+                            {% if perf.total_profit >= 0 %}
                                 <span class="profit-positive">₹{{ perf.total_profit|floatformat:0 }}</span>
                             {% else %}
                                 <span class="profit-negative">₹{{ perf.total_profit|floatformat:0 }}</span>
                             {% endif %}
                         </td>
                         <td>
-                            {% if perf.profit_rank <= 5 %}
-                                <span class="badge badge-success">Top Performer</span>
-                            {% elif perf.profit_rank >= bus_count|add:"-4" %}
-                                <span class="badge badge-warning">Needs Better Route</span>
+                            {% if perf.profit_rank == 1 %}
+                                <span class="badge badge-success">🏆 Top Earner</span>
+                            {% elif perf.profit_rank == bus_count %}
+                                <span class="badge badge-warning">📉 Lowest Earner</span>
                             {% else %}
-                                <span class="badge">Average</span>
+                                <span class="badge" style="background:rgba(110,118,129,0.1);border-color:#30363d;color:#8b949e;">Average</span>
                             {% endif %}
                         </td>
                     </tr>
