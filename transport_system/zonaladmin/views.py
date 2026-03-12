@@ -1716,3 +1716,74 @@ def calculate_week_profits(request):
         f"({week_start_str} to {week_end.strftime('%Y-%m-%d')})!"
     )
     return redirect("schedule-generator")
+
+@login_required
+def simulate_passengers(request):
+    """Simulate passenger data for testing (adds fake passengers to schedules)"""
+    user = request.user
+
+    if not (user.is_superuser or getattr(user, "role", None) in ["admin", "zonal_admin"]):
+        messages.error(request, "Permission denied.")
+        return redirect("schedule-generator")
+
+    if request.method != "POST":
+        return redirect("schedule-generator")
+
+    week_start_str = request.POST.get('week_start', '').strip()
+
+    if not week_start_str:
+        messages.error(request, "No week selected.")
+        return redirect("schedule-generator")
+
+    try:
+        week_start = date.fromisoformat(week_start_str)
+    except ValueError:
+        messages.error(request, f"Invalid date: '{week_start_str}'")
+        return redirect("schedule-generator")
+
+    week_end = week_start + timedelta(days=6)
+
+    # Check if schedules exist
+    if not Schedule.objects.filter(date__gte=week_start, date__lte=week_end).exists():
+        messages.warning(request, f"No schedules for {week_start_str}. Generate schedules first!")
+        return redirect("schedule-generator")
+
+    try:
+        import subprocess
+        import sys
+        import os
+        
+        cmd = [
+            sys.executable,
+            'manage.py',
+            'simulate_passengers',
+            f'--week-start={week_start}'
+        ]
+        
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+        
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=env,
+            encoding='utf-8',
+            errors='replace'
+        )
+        
+        if result.returncode == 0:
+            messages.success(
+                request,
+                f"🎲 Successfully simulated passenger data for {week_start_str}!"
+            )
+        else:
+            messages.error(request, f"❌ Error: {result.stderr[:500]}")
+            
+    except subprocess.TimeoutExpired:
+        messages.error(request, "❌ Command timed out")
+    except Exception as e:
+        messages.error(request, f"❌ Error: {str(e)}")
+
+    return redirect("schedule-generator")

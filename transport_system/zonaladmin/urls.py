@@ -43,4 +43,5 @@ urlpatterns = [
     path('schedule-generator/', views.schedule_generator, name='schedule-generator'),
     path('generate-week-schedules/', views.generate_week_schedules, name='generate-week-schedules'),
     path('calculate-week-profits/', views.calculate_week_profits, name='calculate-week-profits'),
+    path('simulate-passengers/', views.simulate_passengers, name='simulate-passengers'),
 ]
