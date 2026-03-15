@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Manage Drivers – Zonal Admin</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+            font-family: 'IBM Plex Sans', sans-serif;
+            margin: 0;
+            background: #0d1117;
+            color: #e6edf3;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .header-logo {
+            width: 32px; height: 32px;
+            background: #1f6feb;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px;
+        }
+        .header h2 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: #e6edf3;
+        }
+        .back-link {
+            color: #8b949e;
+            text-decoration: none;
+            font-size: 13px;
+            transition: color 0.15s;
+        }
+        .back-link:hover { color: #e6edf3; }
+
+        .container { 
+            max-width: 1200px;
+            margin: 24px auto;
+            padding: 0 32px; 
+        }
+
+        .alert {
+            padding: 14px 18px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            font-weight: 500;
+            border: 1px solid;
+        }
+        .alert-warning { 
+            background: rgba(249, 115, 22, 0.1); 
+            border-color: rgba(249, 115, 22, 0.3); 
+            color: #f97316; 
+        }
+        .alert-success { 
+            background: rgba(63, 185, 80, 0.1); 
+            border-color: rgba(63, 185, 80, 0.3); 
+            color: #3fb950; 
+        }
+
+        .card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #e6edf3;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            border: 1px solid;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s;
+        }
+        .btn-primary {
+            background: #238636;
+            border-color: #2ea043;
+            color: #fff;
+        }
+        .btn-primary:hover { background: #2ea043; }
+        .btn-secondary {
+            background: #1f6feb;
+            border-color: #388bfd;
+            color: #fff;
+        }
+        .btn-secondary:hover { background: #388bfd; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        th {
+            background: #0d1117;
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #8b949e;
+            border-bottom: 1px solid #30363d;
+        }
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #21262d;
+            color: #c9d1d9;
+        }
+        tbody tr:hover td {
+            background: #1c2128;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            font-size: 11px;
+            border-radius: 999px;
+            font-weight: 500;
+            border: 1px solid;
+        }
+        .badge-success {
+            background: rgba(63, 185, 80, 0.1);
+            border-color: rgba(63, 185, 80, 0.3);
+            color: #3fb950;
+        }
+        .badge-warning {
+            background: rgba(249, 115, 22, 0.1);
+            border-color: rgba(249, 115, 22, 0.3);
+            color: #f97316;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="header-left">
+        <div class="header-logo">👨‍✈️</div>
+        <h2>Manage Drivers</h2>
+    </div>
+    <a href="/zonal-admin/" class="back-link">← Dashboard</a>
+</div>
+
+<div class="container">
+
+    <!-- Messages -->
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+
+    <!-- Warning for unassigned drivers -->
+    {% if unassigned_count > 0 %}
+    <div class="alert alert-warning">
+        ⚠️ <strong>{{ unassigned_count }} driver(s) need permanent bus assignment.</strong>
+        Assign buses to enable auto-driver selection for spare dispatch.
+    </div>
+    {% endif %}
+
+    <!-- Drivers List -->
+    <div class="card">
+        <div class="card-title">
+            <span>👨‍✈️ All Drivers</span>
+            <a href="{% url 'add-driver' %}" class="btn btn-primary">+ Add Driver</a>
+        </div>
+
+        {% if drivers %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Permanent Bus</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for driver in drivers %}
+                <tr>
+                    <td style="font-weight:600; color:#e6edf3;">
+                        {{ driver.first_name }} {{ driver.last_name }}
+                    </td>
+                    <td style="font-family:'IBM Plex Mono', monospace; color:#8b949e;">
+                        {{ driver.username }}
+                    </td>
+                    <td style="color:#8b949e;">
+                        {{ driver.email|default:"—" }}
+                    </td>
+                    <td>
+                        {% if driver.permanent_bus %}
+                            <span class="badge badge-success">
+                                {{ driver.permanent_bus.number_plate }}
+                            </span>
+                        {% else %}
+                            <span class="badge badge-warning">
+                                ⚠️ Not Assigned
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if driver.is_active %}
+                            <span style="color:#3fb950; font-size:11px;">● Active</span>
+                        {% else %}
+                            <span style="color:#8b949e; font-size:11px;">○ Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'edit-driver' driver.id %}" class="btn btn-secondary" style="padding:4px 10px; font-size:12px;">
+                            Edit
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div style="text-align:center; padding:40px; color:#8b949e;">
+            No drivers found. Click "Add Driver" to create one.
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+</body>
+</html>

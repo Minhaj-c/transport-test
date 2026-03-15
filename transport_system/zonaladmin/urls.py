@@ -44,4 +44,7 @@ urlpatterns = [
     path('generate-week-schedules/', views.generate_week_schedules, name='generate-week-schedules'),
     path('calculate-week-profits/', views.calculate_week_profits, name='calculate-week-profits'),
     path('simulate-passengers/', views.simulate_passengers, name='simulate-passengers'),
+    path('drivers/', views.manage_drivers, name='manage-drivers'),
+    path('drivers/add/', views.add_driver, name='add-driver'),
+    path('drivers/edit/<int:driver_id>/', views.edit_driver, name='edit-driver'),
 ]

@@ -56,6 +56,7 @@ class CustomUser(AbstractUser):
     Custom User Model
     - Uses email instead of username for authentication
     - Has role field for access control (passenger, driver, zonal admin, admin)
+    - Drivers can be assigned a permanent bus
     """
 
     username = None  # Remove username field
@@ -65,7 +66,7 @@ class CustomUser(AbstractUser):
     ROLE_CHOICES = (
         ('passenger', 'Passenger'),
         ('driver', 'Driver'),
-        ('zonal_admin', 'Zonal Admin'),   # ✅ NEW ROLE
+        ('zonal_admin', 'Zonal Admin'),
         ('admin', 'Admin'),
     )
     role = models.CharField(
@@ -83,6 +84,16 @@ class CustomUser(AbstractUser):
         blank=True,
         related_name='users',
         help_text="Zone for zonal admins and drivers"
+    )
+
+    # Permanent bus assignment (for drivers)
+    permanent_bus = models.ForeignKey(
+        'schedules.Bus',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='permanent_driver',
+        help_text='The bus this driver is permanently assigned to'
     )
 
     # Set email as the unique identifier

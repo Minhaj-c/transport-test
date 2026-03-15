@@ -17,6 +17,8 @@ from io import StringIO
 from schedules.models import Schedule, WeeklyBusPerformance, Bus
 from users.models import CustomUser
 from decimal import Decimal
+from django.db import models
+from django.contrib.auth.hashers import make_password
 
 # Alert engines – ONLY these (❌ no build_prediction_alerts_for_ui)
 from zonaladmin.logic.alert_engine import (
@@ -441,33 +443,24 @@ def zonal_demand_alerts(request):
 @login_required
 def dispatch_spare_bus(request, alert_id):
     """
-    Zonal / central admin uses this page to convert an alert into
-    a real spare-bus schedule that starts from the overflow stop.
-
-    - Takes a DemandAlert (usually prediction-based).
-    - Identifies the overflow stop from the alert.
-    - Lets admin pick:
-        * Spare bus (from idle, active buses)
-        * Driver
-        * Date & departure time
-    - Creates a new Schedule with starting_stop_sequence set to overflow stop.
-    - Marks bus as running and links it to that schedule.
-    - Marks alert as 'dispatched' + updates admin_notes.
+    Dispatch spare bus with AUTO-DRIVER assignment.
+    Admin only selects: bus, date, departure time.
+    Driver is automatically assigned from bus.permanent_driver.
     """
     user = request.user
-
+ 
     alert = get_object_or_404(
         DemandAlert.objects.select_related("stop", "stop__route"),
         id=alert_id,
     )
-
+ 
     # Zonal admin: restrict to own zone
     if getattr(user, "role", None) == "zonal_admin" and getattr(user, "zone_id", None):
         if alert.stop.route.zone_id != user.zone_id:
             return redirect("zonal-demand")
-
+ 
     route = alert.stop.route
-    overflow_stop = alert.stop  # 🔥 This is where the overflow occurs
+    overflow_stop = alert.stop  # Where the overflow occurs
     
     # Default date: alert creation date (or today fallback)
     alert_date = getattr(alert, "created_at", None)
@@ -475,42 +468,38 @@ def dispatch_spare_bus(request, alert_id):
         selected_date = alert_date.date()
     else:
         selected_date = timezone.localdate()
-
+ 
     # Candidate spare buses: active & currently not running
-    buses = Bus.objects.filter(is_active=True, is_running=False).order_by("number_plate")
-
-    # Drivers (filter by zone if zonal admin)
-    if getattr(user, "role", None) == "zonal_admin" and getattr(user, "zone_id", None):
-        drivers = CustomUser.objects.filter(role="driver", zone=user.zone)
-    else:
-        drivers = CustomUser.objects.filter(role="driver")
-
+    buses = Bus.objects.filter(
+        is_active=True, 
+        is_running=False
+    ).order_by("number_plate")
+ 
     # Remaining stops from overflow point
     remaining_stops = route.stops.filter(
         sequence__gte=overflow_stop.sequence
     ).order_by('sequence')
-
+ 
     error = None
-
+ 
     if request.method == "POST":
         bus_id = request.POST.get("bus_id")
-        driver_id = request.POST.get("driver_id")
         date_str = request.POST.get("date")
         departure_time_str = request.POST.get("departure_time")
         arrival_time_str = request.POST.get("arrival_time")
-
+ 
         # Parse date
         try:
             sched_date = datetime.strptime(date_str, "%Y-%m-%d").date()
         except Exception:
             sched_date = selected_date
-
+ 
         # Parse times (HH:MM)
         try:
             departure_time = datetime.strptime(departure_time_str, "%H:%M").time()
         except Exception:
             departure_time = None
-
+ 
         try:
             arrival_time = (
                 datetime.strptime(arrival_time_str, "%H:%M").time()
@@ -519,94 +508,109 @@ def dispatch_spare_bus(request, alert_id):
             )
         except Exception:
             arrival_time = None
-
-        if not (bus_id and driver_id and departure_time):
-            error = "Please select a spare bus, driver and departure time."
+ 
+        if not (bus_id and departure_time):
+            error = "Please select a spare bus and departure time."
         else:
             bus_obj = get_object_or_404(Bus, id=bus_id)
-            driver_obj = get_object_or_404(CustomUser, id=driver_id, role="driver")
-
-            # 🔥 CHECK IF SCHEDULE ALREADY EXISTS
-            existing_schedule = Schedule.objects.filter(
-                bus=bus_obj,
-                date=sched_date,
-                departure_time=departure_time
-            ).first()
-
-            if existing_schedule:
+            
+            # AUTO-ASSIGN DRIVER from bus.permanent_driver
+            # Use .first() to get actual CustomUser object from RelatedManager
+            driver_obj = bus_obj.permanent_driver.first()
+            
+            if not driver_obj:
                 error = (
-                    f"Bus {bus_obj.number_plate} already has a schedule "
-                    f"on {sched_date} at {departure_time}. "
-                    f"Choose a different time or bus."
+                    f"Bus {bus_obj.number_plate} has no permanent driver assigned. "
+                    f"Please assign a driver to this bus first in the Driver Management page."
                 )
             else:
-                # 🔥 Create the spare schedule starting from overflow stop
-                schedule = Schedule.objects.create(
-                    route=route,
+ 
+                # Check if schedule already exists
+                existing_schedule = Schedule.objects.filter(
                     bus=bus_obj,
-                    driver=driver_obj,
                     date=sched_date,
-                    departure_time=departure_time,
-                    arrival_time=arrival_time or departure_time,
-                    total_seats=bus_obj.capacity,
-                    available_seats=bus_obj.capacity,
-                    current_stop_sequence=overflow_stop.sequence,  # Current position (will change)
-                    starting_stop_sequence=overflow_stop.sequence,  # 🔥 ORIGINAL START (never changes)
-                    is_spare_trip=True,
-                    source_alert=alert,
-                )
-
-                # Mark bus as running on this route/schedule (NO GPS)
-                bus_obj.is_running = True
-                bus_obj.current_route = route
-                bus_obj.current_schedule = schedule
-                bus_obj.save(
-                    update_fields=[
-                        "is_running",
-                        "current_route",
-                        "current_schedule",
-                    ]
-                )
-
-                # Update alert status & notes
-                if hasattr(alert, "status"):
-                    alert.status = "dispatched"
-
-                extra_note = (
-                    f" Spare bus {bus_obj.number_plate} dispatched "
-                    f"from stop '{overflow_stop.name}' (seq: {overflow_stop.sequence}) "
-                    f"(schedule #{schedule.id})."
-                )
-                if alert.admin_notes:
-                    alert.admin_notes = alert.admin_notes + extra_note
+                    departure_time=departure_time
+                ).first()
+ 
+                if existing_schedule:
+                    error = (
+                        f"Bus {bus_obj.number_plate} already has a schedule "
+                        f"on {sched_date} at {departure_time}. "
+                        f"Choose a different time or bus."
+                    )
                 else:
-                    alert.admin_notes = extra_note
-                alert.save(
-                    update_fields=["admin_notes"]
-                    + (["status"] if hasattr(alert, "status") else [])
-                )
-
-                # Back to demand list
-                return redirect("zonal-demand")
-
+                    # Create the spare schedule starting from overflow stop
+                    schedule = Schedule.objects.create(
+                        route=route,
+                        bus=bus_obj,
+                        driver=driver_obj,  # AUTO-ASSIGNED!
+                        date=sched_date,
+                        departure_time=departure_time,
+                        arrival_time=arrival_time or departure_time,
+                        total_seats=bus_obj.capacity,
+                        available_seats=bus_obj.capacity,
+                        current_stop_sequence=overflow_stop.sequence,
+                        starting_stop_sequence=overflow_stop.sequence,
+                        is_spare_trip=True,
+                        source_alert=alert,
+                    )
+ 
+                    # Mark bus as running
+                    bus_obj.is_running = True
+                    bus_obj.current_route = route
+                    bus_obj.current_schedule = schedule
+                    bus_obj.save(
+                        update_fields=[
+                            "is_running",
+                            "current_route",
+                            "current_schedule",
+                        ]
+                    )
+ 
+                    # Update alert status & notes
+                    if hasattr(alert, "status"):
+                        alert.status = "dispatched"
+ 
+                    extra_note = (
+                        f" Spare bus {bus_obj.number_plate} dispatched "
+                        f"with driver {driver_obj.get_full_name()} "
+                        f"from stop '{overflow_stop.name}' (seq: {overflow_stop.sequence}) "
+                        f"(schedule #{schedule.id})."
+                    )
+                    if alert.admin_notes:
+                        alert.admin_notes = alert.admin_notes + extra_note
+                    else:
+                        alert.admin_notes = extra_note
+                    alert.save(
+                        update_fields=["admin_notes"]
+                        + (["status"] if hasattr(alert, "status") else [])
+                    )
+ 
+                    messages.success(
+                        request,
+                        f"✅ Spare bus {bus_obj.number_plate} dispatched with driver {driver_obj.get_full_name()}!"
+                    )
+                    
+                    # Back to demand list
+                    return redirect("zonal-demand")
+ 
     # Default suggested departure time = now (HH:MM)
     initial_departure = timezone.localtime().strftime("%H:%M")
-
+ 
     context = {
         "user": user,
         "alert": alert,
         "route": route,
-        "overflow_stop": overflow_stop,  # 🔥 Pass to template
-        "remaining_stops": remaining_stops,  # 🔥 Pass to template
+        "overflow_stop": overflow_stop,
+        "remaining_stops": remaining_stops,
         "selected_date": selected_date,
-        "buses": buses,
-        "drivers": drivers,
+        "buses": buses,  # Now includes permanent_driver info
         "initial_departure": initial_departure,
         "error": error,
     }
-
+ 
     return render(request, "zonaladmin/dispatch_spare_bus.html", context)
-# --------------------------
+
 # 7) ROUTES PAGE
 # --------------------------
 @login_required
@@ -1787,3 +1791,179 @@ def simulate_passengers(request):
         messages.error(request, f"❌ Error: {str(e)}")
 
     return redirect("schedule-generator")
+
+@login_required
+def manage_drivers(request):
+    """
+    List all drivers with their permanent bus assignments.
+    Shows warning for drivers without permanent bus.
+    """
+    user = request.user
+    
+    # Only admin and zonal_admin can manage drivers
+    if not (user.is_superuser or getattr(user, "role", None) in ["admin", "zonal_admin"]):
+        messages.error(request, "Permission denied.")
+        return redirect("zonal-dashboard")
+    
+    # Get drivers (filter by zone for zonal admin)
+    if getattr(user, "role", None) == "zonal_admin" and getattr(user, "zone_id", None):
+        drivers = CustomUser.objects.filter(role='driver', zone=user.zone).order_by('first_name')
+    else:
+        drivers = CustomUser.objects.filter(role='driver').order_by('first_name')
+    
+    # Count unassigned drivers
+    unassigned_count = drivers.filter(permanent_bus__isnull=True).count()
+    
+    context = {
+        "user": user,
+        "drivers": drivers,
+        "unassigned_count": unassigned_count,
+    }
+    
+    return render(request, "zonaladmin/manage_drivers.html", context)
+ 
+ 
+@login_required
+def add_driver(request):
+    """
+    Add a new driver with permanent bus assignment.
+    """
+    user = request.user
+    
+    # Only admin and zonal_admin can add drivers
+    if not (user.is_superuser or getattr(user, "role", None) in ["admin", "zonal_admin"]):
+        messages.error(request, "Permission denied.")
+        return redirect("manage-drivers")
+    
+    error = None
+    
+    # Get available buses (no permanent driver assigned)
+    available_buses = Bus.objects.filter(
+        permanent_driver__isnull=True,
+        is_active=True
+    ).order_by('number_plate')
+    
+    if request.method == "POST":
+        first_name = request.POST.get("first_name", "").strip()
+        last_name = request.POST.get("last_name", "").strip()
+        email = request.POST.get("email", "").strip()
+        username = request.POST.get("username", "").strip()
+        password = request.POST.get("password", "").strip()
+        permanent_bus_id = request.POST.get("permanent_bus")
+        
+        # Validation
+        if not all([first_name, last_name, username, password]):
+            error = "First name, last name, username, and password are required."
+        elif CustomUser.objects.filter(username=username).exists():
+            error = f"Username '{username}' already exists."
+        elif email and CustomUser.objects.filter(email=email).exists():
+            error = f"Email '{email}' already exists."
+        else:
+            try:
+                # Determine zone for zonal admin
+                zone = None
+                if getattr(user, "role", None) == "zonal_admin":
+                    zone = user.zone
+                
+                # Get permanent bus if selected
+                permanent_bus = None
+                if permanent_bus_id:
+                    permanent_bus = Bus.objects.get(id=permanent_bus_id)
+                
+                # Create driver
+                driver = CustomUser.objects.create(
+                    username=username,
+                    email=email,
+                    first_name=first_name,
+                    last_name=last_name,
+                    password=make_password(password),
+                    role='driver',
+                    zone=zone,
+                    permanent_bus=permanent_bus,
+                )
+                
+                messages.success(
+                    request, 
+                    f"✅ Driver {first_name} {last_name} added successfully!"
+                )
+                return redirect("manage-drivers")
+                
+            except Exception as e:
+                error = f"Error creating driver: {str(e)}"
+    
+    context = {
+        "user": user,
+        "error": error,
+        "available_buses": available_buses,
+    }
+    
+    return render(request, "zonaladmin/add_driver.html", context)
+ 
+ 
+@login_required
+def edit_driver(request, driver_id):
+    """
+    Edit existing driver details and permanent bus assignment.
+    """
+    user = request.user
+    
+    # Only admin and zonal_admin can edit drivers
+    if not (user.is_superuser or getattr(user, "role", None) in ["admin", "zonal_admin"]):
+        messages.error(request, "Permission denied.")
+        return redirect("manage-drivers")
+    
+    driver = get_object_or_404(CustomUser, id=driver_id, role='driver')
+    
+    # Zonal admin: ensure driver belongs to their zone
+    if getattr(user, "role", None) == "zonal_admin" and driver.zone != user.zone:
+        messages.error(request, "You can only edit drivers in your zone.")
+        return redirect("manage-drivers")
+    
+    error = None
+    
+    # Get available buses (no driver OR this driver's current bus)
+    available_buses = Bus.objects.filter(
+        models.Q(permanent_driver__isnull=True) | models.Q(permanent_driver=driver),
+        is_active=True
+    ).order_by('number_plate')
+    
+    if request.method == "POST":
+        first_name = request.POST.get("first_name", "").strip()
+        last_name = request.POST.get("last_name", "").strip()
+        email = request.POST.get("email", "").strip()
+        permanent_bus_id = request.POST.get("permanent_bus")
+        
+        # Validation
+        if not all([first_name, last_name]):
+            error = "First name and last name are required."
+        elif email and CustomUser.objects.filter(email=email).exclude(id=driver_id).exists():
+            error = f"Email '{email}' is already used by another driver."
+        else:
+            try:
+                # Update driver
+                driver.first_name = first_name
+                driver.last_name = last_name
+                driver.email = email
+                
+                # Update permanent bus
+                if permanent_bus_id:
+                    driver.permanent_bus = Bus.objects.get(id=permanent_bus_id)
+                else:
+                    driver.permanent_bus = None
+                
+                driver.save()
+                
+                messages.success(request, f"✅ Driver {first_name} {last_name} updated!")
+                return redirect("manage-drivers")
+                
+            except Exception as e:
+                error = f"Error updating driver: {str(e)}"
+    
+    context = {
+        "user": user,
+        "driver": driver,
+        "error": error,
+        "available_buses": available_buses,
+    }
+    
+    return render(request, "zonaladmin/edit_driver.html", context)

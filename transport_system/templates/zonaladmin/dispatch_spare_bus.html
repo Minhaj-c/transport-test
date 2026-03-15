@@ -54,6 +54,11 @@
             background: #eff6ff;
         }
 
+        .card-success {
+            border-left: 4px solid var(--success);
+            background: #f0fdf4;
+        }
+
         .title {
             font-size: 18px;
             font-weight: 600;
@@ -168,6 +173,10 @@
             font-size: 12px;
             color: #b91c1c;
             margin-bottom: 8px;
+            padding: 8px 10px;
+            background: #fee2e2;
+            border-radius: 6px;
+            border: 1px solid #fecaca;
         }
 
         .badge-level-high {
@@ -191,6 +200,19 @@
             line-height: 16px;
             font-size: 11px;
             font-weight: bold;
+        }
+
+        .driver-preview {
+            background: #f0fdf4;
+            border: 1px solid #86efac;
+            border-radius: 6px;
+            padding: 10px 12px;
+            margin-top: 8px;
+            font-size: 12px;
+        }
+
+        .driver-preview strong {
+            color: #15803d;
         }
     </style>
 </head>
@@ -272,46 +294,60 @@
         </details>
     </div>
 
+    <!-- Auto-Driver Info -->
+    <div class="card card-success">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+            <span class="info-icon" style="background: var(--success);">✓</span>
+            <strong style="font-size: 14px;">Auto-Driver Assignment</strong>
+        </div>
+        <p style="margin: 0; font-size: 12px; color: var(--text-muted);">
+            When you select a bus, the driver will be <strong>automatically assigned</strong> based on the bus's permanent driver assignment.
+        </p>
+    </div>
+
     <!-- Dispatch Form -->
     <div class="card">
         <p class="subtitle" style="margin-bottom:10px;">
-            Choose a spare bus, driver, and departure time to create a new schedule.
+            Choose a spare bus and departure time. Driver will be auto-assigned.
         </p>
 
         {% if error %}
             <div class="error">⚠️ {{ error }}</div>
         {% endif %}
 
-        <form method="post">
+        <form method="post" id="dispatchForm">
             {% csrf_token %}
 
             <div class="field">
                 <label for="bus_id">Spare Bus *</label>
-                <select name="bus_id" id="bus_id" required>
+                <select name="bus_id" id="bus_id" required onchange="updateDriverPreview()">
                     <option value="">-- Select spare bus --</option>
                     {% for bus in buses %}
-                        <option value="{{ bus.id }}">
+                        {% with driver=bus.permanent_driver.first %}
+                        <option 
+                            value="{{ bus.id }}"
+                            data-driver="{% if driver %}{{ driver.get_full_name|default:driver.email }}{% else %}No driver assigned{% endif %}"
+                            data-has-driver="{% if driver %}true{% else %}false{% endif %}"
+                        >
                             {{ bus.number_plate }} (capacity: {{ bus.capacity }})
+                            {% if driver %} – Driver: {{ driver.get_full_name|default:driver.email }}{% endif %}
                         </option>
+                        {% endwith %}
                     {% empty %}
                         <option value="">No idle buses available</option>
                     {% endfor %}
                 </select>
-            </div>
-
-            <div class="field">
-                <label for="driver_id">Driver *</label>
-                <select name="driver_id" id="driver_id" required>
-                    <option value="">-- Select driver --</option>
-                    {% for d in drivers %}
-                        <option value="{{ d.id }}">
-                            {{ d.name|default:d.email }}
-                            {% if d.zone %} – {{ d.zone.name }}{% endif %}
-                        </option>
-                    {% empty %}
-                        <option value="">No drivers found</option>
-                    {% endfor %}
-                </select>
+                
+                <!-- Driver Preview (shows after bus selection) -->
+                <div id="driverPreview" class="driver-preview" style="display:none;">
+                    <strong>✓ Driver Auto-Assigned:</strong>
+                    <span id="driverName"></span>
+                </div>
+                
+                <!-- Warning if no driver -->
+                <div id="noDriverWarning" class="error" style="display:none; margin-top:8px;">
+                    ⚠️ This bus has no permanent driver assigned. Please assign a driver to this bus first in the <a href="{% url 'manage-drivers' %}">Driver Management</a> page.
+                </div>
             </div>
 
             <div class="field">
@@ -352,13 +388,47 @@
 
             <div class="actions">
                 <a href="{% url 'zonal-demand' %}" class="btn btn-secondary">Cancel</a>
-                <button type="submit" class="btn btn-primary">
+                <button type="submit" class="btn btn-primary" id="submitBtn">
                     🚌 Dispatch Spare Bus
                 </button>
             </div>
         </form>
     </div>
 </div>
+
+<script>
+function updateDriverPreview() {
+    const select = document.getElementById('bus_id');
+    const option = select.options[select.selectedIndex];
+    const driverPreview = document.getElementById('driverPreview');
+    const driverName = document.getElementById('driverName');
+    const noDriverWarning = document.getElementById('noDriverWarning');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    if (option.value) {
+        const hasDriver = option.getAttribute('data-has-driver') === 'true';
+        const driver = option.getAttribute('data-driver');
+        
+        if (hasDriver) {
+            // Show driver preview
+            driverName.textContent = driver;
+            driverPreview.style.display = 'block';
+            noDriverWarning.style.display = 'none';
+            submitBtn.disabled = false;
+        } else {
+            // Show warning - no driver assigned
+            driverPreview.style.display = 'none';
+            noDriverWarning.style.display = 'block';
+            submitBtn.disabled = true;
+        }
+    } else {
+        // No bus selected
+        driverPreview.style.display = 'none';
+        noDriverWarning.style.display = 'none';
+        submitBtn.disabled = false;
+    }
+}
+</script>
 
 </body>
 </html>
