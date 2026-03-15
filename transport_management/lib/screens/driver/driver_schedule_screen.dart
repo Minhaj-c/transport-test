@@ -35,19 +35,15 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
     _restoreRunningState();
   }
 
-  // ── Restore persisted running state, then load schedules ──────────────────
   Future<void> _restoreRunningState() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final wasRunning   = prefs.getBool(_kIsRunning) ?? false;
+      final wasRunning    = prefs.getBool(_kIsRunning) ?? false;
       final activeSchedId = prefs.getInt(_kActiveSchedId);
-
       if (wasRunning && activeSchedId != null) {
-        // Will be matched after schedules load
         _isRunning = true;
       }
     } catch (_) {}
-
     await _loadSchedules();
   }
 
@@ -67,7 +63,6 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
             s.date.day == now.day;
       }).toList();
 
-      // Restore active schedule from prefs if running
       if (_isRunning) {
         final prefs = await SharedPreferences.getInstance();
         final activeSchedId = prefs.getInt(_kActiveSchedId);
@@ -82,19 +77,18 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
         if (matched != null) {
           if (mounted) {
             setState(() {
-              _schedules = schedules;
+              _schedules      = schedules;
               _activeSchedule = matched;
-              _isRunning = true;
-              _isLoading = false;
+              _isRunning      = true;
+              _isLoading      = false;
             });
           }
-          // Resume location tracking
           _startLocationTracking(matched);
           return;
         } else {
-          // Active schedule not found (maybe date changed), clear persisted state
+          // Active schedule not found — it was completed and removed from list
           await _clearPersistedRunningState();
-          _isRunning = false;
+          _isRunning      = false;
           _activeSchedule = null;
         }
       }
@@ -108,14 +102,13 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = 'Failed to load schedules: ${e.toString()}';
+          _error     = 'Failed to load schedules: ${e.toString()}';
           _isLoading = false;
         });
       }
     }
   }
 
-  // ── Persist / clear running state ────────────────────────────────────────
   Future<void> _persistRunningState(int scheduleId) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kIsRunning, true);
@@ -128,13 +121,11 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
     await prefs.remove(_kActiveSchedId);
   }
 
-  // ── Start bus ────────────────────────────────────────────────────────────
   Future<void> _startBus(Schedule schedule) async {
     setState(() => _isStarting = true);
 
     try {
       final position = await LocationService.getCurrentLocation();
-
       if (position == null) {
         throw Exception('Could not get location. Please enable GPS.');
       }
@@ -148,13 +139,12 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
 
       if (!mounted) return;
 
-      // Persist so reopening the app restores this state
       await _persistRunningState(schedule.id);
 
       setState(() {
         _activeSchedule = schedule;
-        _isRunning = true;
-        _isStarting = false;
+        _isRunning      = true;
+        _isStarting     = false;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -174,7 +164,6 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
       _startLocationTracking(schedule);
     } catch (e) {
       if (!mounted) return;
-
       setState(() => _isStarting = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -202,10 +191,7 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
     if (!_isRunning || _activeSchedule?.id != schedule.id) return;
 
     Future.delayed(const Duration(seconds: 30), () async {
-      if (!mounted || !_isRunning || _activeSchedule?.id != schedule.id) {
-        return;
-      }
-
+      if (!mounted || !_isRunning || _activeSchedule?.id != schedule.id) return;
       try {
         final position = await LocationService.getCurrentLocation();
         if (position != null && mounted) {
@@ -215,7 +201,6 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
             longitude: position.longitude,
             scheduleId: schedule.id,
           );
-
           _startLocationTracking(schedule);
         }
       } catch (e) {
@@ -224,13 +209,11 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
     });
   }
 
-  // ── Stop bus ─────────────────────────────────────────────────────────────
   Future<void> _stopBus() async {
     if (!mounted || _activeSchedule == null) return;
 
     final completedSchedule = _activeSchedule;
 
-    // Check for handoff if this was a spare trip
     if (completedSchedule!.isSpareTrip) {
       try {
         final result = await ApiService.completeSpareTripAndCheckHandoff(
@@ -241,7 +224,6 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
 
         if (result['has_handoff'] == true) {
           final handoff = result['handoff_schedule'];
-
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Column(
@@ -273,9 +255,7 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
               action: SnackBarAction(
                 label: 'View',
                 textColor: Colors.white,
-                onPressed: () {
-                  _loadSchedules();
-                },
+                onPressed: () => _loadSchedules(),
               ),
             ),
           );
@@ -303,7 +283,6 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
         );
       }
     } else {
-      // Normal trip completion
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Row(
@@ -318,14 +297,11 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
       );
     }
 
-    // Clear persisted running state
     await _clearPersistedRunningState();
-
     setState(() {
-      _isRunning = false;
+      _isRunning      = false;
       _activeSchedule = null;
     });
-
     await _loadSchedules();
   }
 
@@ -369,9 +345,10 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
                     itemBuilder: (context, index) {
                       final stop = stops[index];
                       final String stopName = stop.name;
-                      final int stopSeq = stop.sequence;
+                      final int stopSeq    = stop.sequence;
 
-                      final isCurrent = schedule.currentStopSequence != null &&
+                      final isCurrent =
+                          schedule.currentStopSequence != null &&
                           schedule.currentStopSequence == stopSeq;
 
                       return ListTile(
@@ -384,26 +361,54 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
                           Navigator.pop(context);
 
                           try {
-                            final resp = await ApiService.updateCurrentStop(
+                            final resp = await ApiService.arrivedAtStop(
                               scheduleId: schedule.id,
-                              stopSequence: stopSeq,
+                              stopId: stop.id,
                             );
                             print('✅ Current stop updated: $resp');
 
-                            await _loadSchedules();
+                            // ✅ Auto-stop when last stop reached
+                            if (resp['route_complete'] == true) {
+                              await _clearPersistedRunningState();
+                              if (mounted) {
+                                setState(() {
+                                  _isRunning      = false;
+                                  _activeSchedule = null;
+                                });
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      '🏁 Route complete! Ready for next schedule.',
+                                    ),
+                                    backgroundColor: Colors.green,
+                                    duration: Duration(seconds: 3),
+                                  ),
+                                );
+                              }
+                            } else {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Current stop set to "$stopName"',
+                                    ),
+                                  ),
+                                );
+                              }
+                            }
 
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Current stop set to "$stopName"'),
-                              ),
-                            );
+                            await _loadSchedules();
                           } catch (e) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Failed to update current stop: $e'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Failed to update current stop: $e',
+                                  ),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
                           }
                         },
                       );
@@ -428,7 +433,8 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
     if (picked == null || !mounted) return;
 
     final estimatedTime =
-        '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+        '${picked.hour.toString().padLeft(2, '0')}:'
+        '${picked.minute.toString().padLeft(2, '0')}';
 
     try {
       final result = await ApiService.reportDelayedArrival(
@@ -445,7 +451,8 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
             backgroundColor: Colors.green,
           ),
         );
-      } else if (result['success'] == true && result['spare_bus_assigned'] == true) {
+      } else if (result['success'] == true &&
+          result['spare_bus_assigned'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(result['message'] ?? 'Spare bus assigned'),
@@ -466,10 +473,7 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
       );
     }
   }
@@ -516,7 +520,8 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
             _ActiveScheduleCard(
               schedule: _activeSchedule!,
               onStop: _stopBus,
-              onUpdateCurrentStop: () => _showCurrentStopPicker(_activeSchedule!),
+              onUpdateCurrentStop: () =>
+                  _showCurrentStopPicker(_activeSchedule!),
               onReportDelay: () => _reportDelayedArrival(_activeSchedule!),
             ),
           Expanded(
@@ -527,7 +532,8 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.event_busy, size: 64, color: Colors.grey[400]),
+                          Icon(Icons.event_busy,
+                              size: 64, color: Colors.grey[400]),
                           const SizedBox(height: 16),
                           Text(
                             'No schedules assigned',
@@ -552,7 +558,7 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
                     itemBuilder: (context, index) {
                       final schedule = _schedules[index];
                       final isActive = _activeSchedule?.id == schedule.id;
-                      final now = DateTime.now();
+                      final now     = DateTime.now();
                       final isToday = schedule.date.year == now.year &&
                           schedule.date.month == now.month &&
                           schedule.date.day == now.day;
@@ -579,7 +585,9 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
   }
 }
 
-// ── _ActiveScheduleCard and _ScheduleCard are unchanged ─────────────────────
+// ─────────────────────────────────────────────────────────────────
+// ACTIVE SCHEDULE CARD
+// ─────────────────────────────────────────────────────────────────
 
 class _ActiveScheduleCard extends StatelessWidget {
   final Schedule schedule;
@@ -646,7 +654,9 @@ class _ActiveScheduleCard extends StatelessWidget {
                 ),
                 child: Icon(
                   Icons.directions_bus,
-                  color: schedule.isSpareTrip ? Colors.orange[800] : Colors.green,
+                  color: schedule.isSpareTrip
+                      ? Colors.orange[800]
+                      : Colors.green,
                   size: 24,
                 ),
               ),
@@ -671,7 +681,8 @@ class _ActiveScheduleCard extends StatelessWidget {
                     if (schedule.currentStopSequence != null)
                       Text(
                         'Current stop: #${schedule.currentStopSequence}',
-                        style: const TextStyle(color: Colors.white70, fontSize: 12),
+                        style: const TextStyle(
+                            color: Colors.white70, fontSize: 12),
                       ),
                   ],
                 ),
@@ -681,7 +692,8 @@ class _ActiveScheduleCard extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 12),
                 ),
                 icon: const Icon(Icons.stop, size: 18),
                 label: const Text('Stop'),
@@ -714,7 +726,7 @@ class _ActiveScheduleCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          if (schedule.isSpareTrip)
+          if (schedule.isSpareTrip) ...[
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
@@ -731,7 +743,8 @@ class _ActiveScheduleCard extends StatelessWidget {
                 ),
               ),
             ),
-          if (schedule.isSpareTrip) const SizedBox(height: 8),
+            const SizedBox(height: 8),
+          ],
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
@@ -753,6 +766,10 @@ class _ActiveScheduleCard extends StatelessWidget {
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────
+// SCHEDULE CARD
+// ─────────────────────────────────────────────────────────────────
 
 class _ScheduleCard extends StatelessWidget {
   final Schedule schedule;
@@ -800,7 +817,8 @@ class _ScheduleCard extends StatelessWidget {
                 ),
                 if (isToday)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: Theme.of(context).primaryColor,
                       borderRadius: BorderRadius.circular(12),
@@ -819,7 +837,8 @@ class _ScheduleCard extends StatelessWidget {
             if (schedule.isSpareTrip)
               Container(
                 margin: const EdgeInsets.only(top: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.orange[50],
                   borderRadius: BorderRadius.circular(4),
@@ -845,9 +864,11 @@ class _ScheduleCard extends StatelessWidget {
             const Divider(),
             Text(
               'Route ${schedule.route.number}',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            Text(schedule.route.name, style: TextStyle(color: Colors.grey[700])),
+            Text(schedule.route.name,
+                style: TextStyle(color: Colors.grey[700])),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -887,8 +908,6 @@ class _ScheduleCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-
-            // Show Start button only if today, not active, and not currently running another bus
             if (isToday && !isActive)
               SizedBox(
                 width: double.infinity,

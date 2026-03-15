@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import 'driver_schedule_screen.dart';
-import 'passenger_counter_screen.dart';
+import 'ticket_screen.dart';
 import '../../services/api_service.dart';
 
 class DriverHomeScreen extends StatefulWidget {
@@ -113,7 +113,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
     final List<Widget> screens = [
       DriverScheduleScreen(key: _scheduleKey),
-      const PassengerCounterScreen(),
+      const TicketScreen(),
     ];
 
     return Scaffold(

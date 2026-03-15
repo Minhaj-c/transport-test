@@ -30,15 +30,11 @@ class ApiService {
   static Future<List<BusRoute>> getRoutes() async {
     try {
       print('Fetching routes from: ${ApiConfig.routes}');
-      
       final response = await http.get(
         Uri.parse(ApiConfig.routes),
         headers: _headers,
       );
-
       print('Routes response status: ${response.statusCode}');
-      print('Routes response body: ${response.body}');
-
       if (response.statusCode == 200) {
         final List data = json.decode(response.body);
         return data.map((json) => BusRoute.fromJson(json)).toList();
@@ -57,9 +53,6 @@ class ApiService {
         Uri.parse(ApiConfig.routeDetail(id)),
         headers: _headers,
       );
-
-      print('Route detail response: ${response.statusCode}');
-
       if (response.statusCode == 200) {
         return BusRoute.fromJson(json.decode(response.body));
       } else {
@@ -80,25 +73,12 @@ class ApiService {
       final params = <String, String>{};
       if (routeId != null) params['route_id'] = routeId.toString();
       if (date != null) params['date'] = date;
-      
       if (params.isNotEmpty) {
         url += '?${params.entries.map((e) => '${e.key}=${e.value}').join('&')}';
       }
-
-      print('Fetching schedules from: $url');
-      print('Headers: $_headers');
-
-      final response = await http.get(
-        Uri.parse(url),
-        headers: _headers,
-      );
-
-      print('Schedules response status: ${response.statusCode}');
-      print('Schedules response body: ${response.body}');
-
+      final response = await http.get(Uri.parse(url), headers: _headers);
       if (response.statusCode == 200) {
         final List data = json.decode(response.body);
-        print('Found ${data.length} schedules');
         return data.map((json) => Schedule.fromJson(json)).toList();
       } else if (response.statusCode == 401) {
         throw Exception('Authentication required. Please login again.');
@@ -117,19 +97,13 @@ class ApiService {
   static Future<List<Schedule>> getDriverSchedules() async {
     try {
       print('Fetching driver schedules from: ${ApiConfig.driverSchedules}');
-      print('Headers: $_headers');
-
       final response = await http.get(
         Uri.parse(ApiConfig.driverSchedules),
         headers: _headers,
       );
-
       print('Driver schedules response status: ${response.statusCode}');
-      print('Driver schedules response body: ${response.body}');
-
       if (response.statusCode == 200) {
         final List data = json.decode(response.body);
-        print('Found ${data.length} driver schedules');
         return data.map((json) => Schedule.fromJson(json)).toList();
       } else if (response.statusCode == 401) {
         throw Exception('Authentication required');
@@ -152,33 +126,23 @@ class ApiService {
     required String dateOfTravel,
     required String desiredTime,
     required int boardingStopId,
-    required int dropoffStopId,   
+    required int dropoffStopId,
     required int passengerCount,
   }) async {
     try {
-      print('Creating pre-inform...');
-      print('Headers: $_headers');
-
       final body = {
         'route': routeId,
         'date_of_travel': dateOfTravel,
         'desired_time': desiredTime,
         'boarding_stop': boardingStopId,
-        'dropoff_stop': dropoffStopId,   
+        'dropoff_stop': dropoffStopId,
         'passenger_count': passengerCount,
       };
-
-      print('Pre-inform data: $body');
-
       final response = await http.post(
         Uri.parse(ApiConfig.preinforms),
         headers: _headers,
         body: json.encode(body),
       );
-
-      print('Create pre-inform response: ${response.statusCode}');
-      print('Create pre-inform body: ${response.body}');
-
       if (response.statusCode == 201) {
         final decoded = json.decode(response.body) as Map<String, dynamic>;
         if (decoded['data'] is Map<String, dynamic>) {
@@ -191,12 +155,8 @@ class ApiService {
         try {
           final decoded = json.decode(response.body);
           if (decoded is Map<String, dynamic>) {
-            if (decoded['error'] is String) {
-              throw Exception(decoded['error']);
-            }
-            if (decoded['detail'] is String) {
-              throw Exception(decoded['detail']);
-            }
+            if (decoded['error'] is String) throw Exception(decoded['error']);
+            if (decoded['detail'] is String) throw Exception(decoded['detail']);
             final parts = <String>[];
             decoded.forEach((key, value) {
               if (value is List) {
@@ -205,13 +165,10 @@ class ApiService {
                 parts.add('$key: $value');
               }
             });
-            if (parts.isNotEmpty) {
-              throw Exception(parts.join(' | '));
-            }
+            if (parts.isNotEmpty) throw Exception(parts.join(' | '));
           }
           throw Exception('Failed to create pre-inform (${response.statusCode})');
         } catch (inner) {
-          print('Error parsing pre-inform error body: $inner');
           throw Exception('Failed to create pre-inform (${response.statusCode})');
         }
       }
@@ -223,17 +180,10 @@ class ApiService {
 
   static Future<List<PreInform>> getMyPreInforms() async {
     try {
-      print('Fetching my pre-informs...');
-      print('Headers: $_headers');
-
       final response = await http.get(
         Uri.parse(ApiConfig.myPreinforms),
         headers: _headers,
       );
-
-      print('My pre-informs response: ${response.statusCode}');
-      print('My pre-informs body: ${response.body}');
-
       if (response.statusCode == 200) {
         final List data = json.decode(response.body);
         return data.map((json) => PreInform.fromJson(json)).toList();
@@ -254,7 +204,6 @@ class ApiService {
         Uri.parse(ApiConfig.cancelPreinform(id)),
         headers: _headers,
       );
-
       if (response.statusCode != 200) {
         throw Exception('Failed to cancel pre-inform');
       }
@@ -274,9 +223,6 @@ class ApiService {
     int? scheduleId,
   }) async {
     try {
-      print('Updating bus location...');
-      print('Bus ID: $busId, Lat: $latitude, Lng: $longitude');
-
       final response = await http.post(
         Uri.parse(ApiConfig.updateBusLocation),
         headers: _headers,
@@ -287,10 +233,6 @@ class ApiService {
           if (scheduleId != null) 'schedule_id': scheduleId,
         }),
       );
-
-      print('Update location response: ${response.statusCode}');
-      print('Update location body: ${response.body}');
-
       if (response.statusCode == 200) {
         print('Location updated successfully');
       } else if (response.statusCode == 401) {
@@ -313,77 +255,30 @@ class ApiService {
     required int scheduleId,
     required int count,
   }) async {
-    print('═══════════════════════════════════════════════════════════');
-    print('🚨 updatePassengerCount CALLED');
-    print('═══════════════════════════════════════════════════════════');
-    print('📍 Function entry point reached');
-    print('📊 Parameters:');
-    print('   - scheduleId: $scheduleId');
-    print('   - count: $count');
-    print('🌐 Target URL: ${ApiConfig.updatePassengerCount}');
-    print('🍪 Session cookie exists: ${_sessionCookie != null}');
-    print('🍪 Cookie value: $_sessionCookie');
-    
     try {
-      final requestBody = {
-        'schedule_id': scheduleId,
-        'count': count,
-      };
-      
-      print('📦 Request body: ${json.encode(requestBody)}');
-      print('📋 Headers: $_headers');
-      print('⏱️  About to send HTTP POST...');
-      
-      final beforeRequest = DateTime.now();
-      
       final response = await http.post(
         Uri.parse(ApiConfig.updatePassengerCount),
         headers: _headers,
-        body: json.encode(requestBody),
+        body: json.encode({
+          'schedule_id': scheduleId,
+          'count': count,
+        }),
       );
-      
-      final afterRequest = DateTime.now();
-      final duration = afterRequest.difference(beforeRequest).inMilliseconds;
-      
-      print('⏱️  Request completed in ${duration}ms');
-      print('📥 Response received:');
-      print('   - Status code: ${response.statusCode}');
-      print('   - Body: ${response.body}');
-      print('   - Headers: ${response.headers}');
-
       if (response.statusCode == 200) {
-        print('✅ SUCCESS - Passenger count updated');
-        final decoded = json.decode(response.body) as Map<String, dynamic>;
-        print('📊 Decoded response: $decoded');
-        print('═══════════════════════════════════════════════════════════');
-        return decoded;
+        return json.decode(response.body) as Map<String, dynamic>;
       } else if (response.statusCode == 401) {
-        print('❌ ERROR 401 - Authentication required');
-        print('═══════════════════════════════════════════════════════════');
         throw Exception('Authentication required');
       } else if (response.statusCode == 403) {
-        print('❌ ERROR 403 - Permission denied');
-        print('═══════════════════════════════════════════════════════════');
         throw Exception('Only the assigned driver can update passenger count');
       } else {
-        print('❌ ERROR ${response.statusCode} - Server error');
-        try {
-          final decoded = json.decode(response.body);
-          if (decoded is Map<String, dynamic> && decoded['detail'] is String) {
-            print('Server message: ${decoded['detail']}');
-            print('═══════════════════════════════════════════════════════════');
-            throw Exception(decoded['detail']);
-          }
-        } catch (_) {}
-        print('═══════════════════════════════════════════════════════════');
+        final decoded = json.decode(response.body);
+        if (decoded is Map<String, dynamic> && decoded['detail'] is String) {
+          throw Exception(decoded['detail']);
+        }
         throw Exception('Failed to update passenger count (${response.statusCode})');
       }
-    } catch (e, stackTrace) {
-      print('💥 EXCEPTION in updatePassengerCount:');
-      print('Error: $e');
-      print('Stack trace:');
-      print(stackTrace);
-      print('═══════════════════════════════════════════════════════════');
+    } catch (e) {
+      print('Error updating passenger count: $e');
       rethrow;
     }
   }
@@ -395,26 +290,14 @@ class ApiService {
     required int scheduleId,
     required int stopSequence,
   }) async {
-    print('🚏 updateCurrentStop CALLED');
-    print('   scheduleId: $scheduleId');
-    print('   stopSequence: $stopSequence');
-    print('   URL: ${ApiConfig.updateCurrentStop}');
-    print('   Headers: $_headers');
-
-    final body = json.encode({
-      'schedule_id': scheduleId,
-      'stop_sequence': stopSequence,
-    });
-
     final response = await http.post(
       Uri.parse(ApiConfig.updateCurrentStop),
       headers: _headers,
-      body: body,
+      body: json.encode({
+        'schedule_id': scheduleId,
+        'stop_sequence': stopSequence,
+      }),
     );
-
-    print('🚏 updateCurrentStop status: ${response.statusCode}');
-    print('🚏 updateCurrentStop body: ${response.body}');
-
     if (response.statusCode == 200) {
       return json.decode(response.body) as Map<String, dynamic>;
     } else if (response.statusCode == 401) {
@@ -427,7 +310,7 @@ class ApiService {
   }
 
   // -----------------------------
-  // Passenger Live Status
+  // Live Status
   // -----------------------------
   static Future<Map<String, dynamic>> getLiveStatusForStop({
     required int routeId,
@@ -436,28 +319,10 @@ class ApiService {
   }) async {
     try {
       var url = ApiConfig.routeLiveStatus(routeId);
-      final params = <String, String>{
-        'stop_id': stopId.toString(),
-      };
-      if (date != null) {
-        params['date'] = date;
-      }
-
-      if (params.isNotEmpty) {
-        url += '?${params.entries.map((e) => '${e.key}=${e.value}').join('&')}';
-      }
-
-      print('🔍 Fetching live status from: $url');
-      print('Headers: $_headers');
-
-      final response = await http.get(
-        Uri.parse(url),
-        headers: _headers,
-      );
-
-      print('Live status response: ${response.statusCode}');
-      print('Live status body: ${response.body}');
-
+      final params = <String, String>{'stop_id': stopId.toString()};
+      if (date != null) params['date'] = date;
+      url += '?${params.entries.map((e) => '${e.key}=${e.value}').join('&')}';
+      final response = await http.get(Uri.parse(url), headers: _headers);
       if (response.statusCode == 200) {
         return json.decode(response.body) as Map<String, dynamic>;
       } else if (response.statusCode == 401) {
@@ -466,28 +331,20 @@ class ApiService {
         throw Exception('Failed to load live status (${response.statusCode})');
       }
     } catch (e) {
-      print('❌ Error getting live status: $e');
+      print('Error getting live status: $e');
       rethrow;
     }
   }
 
   // -----------------------------
-  // 🔥 SPARE BUS APIs
+  // Spare Bus APIs
   // -----------------------------
-
-  /// Driver clicks "Enter Spare Mode" button
   static Future<Map<String, dynamic>> enterSpareMode() async {
     try {
-      print('🔥 Calling enterSpareMode API...');
-      
       final response = await http.post(
         Uri.parse('${ApiConfig.baseUrl}/api/schedules/spare/enter/'),
         headers: _headers,
       );
-
-      print('Enter spare mode response: ${response.statusCode}');
-      print('Response body: ${response.body}');
-
       if (response.statusCode == 200) {
         return json.decode(response.body) as Map<String, dynamic>;
       } else {
@@ -495,45 +352,32 @@ class ApiService {
         throw Exception(decoded['error'] ?? 'Failed to enter spare mode');
       }
     } catch (e) {
-      print('❌ Error entering spare mode: $e');
+      print('Error entering spare mode: $e');
       rethrow;
     }
   }
 
-  /// Get spare status for today
   static Future<Map<String, dynamic>> getSpareStatus() async {
     try {
-      print('🔍 Checking spare status...');
-      
       final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/api/schedules/spare/status/'),
         headers: _headers,
       );
-
-      print('Spare status response: ${response.statusCode}');
-      print('Response body: ${response.body}');
-
       if (response.statusCode == 200) {
         return json.decode(response.body) as Map<String, dynamic>;
       }
-      
       return {'has_spare': false};
     } catch (e) {
-      print('❌ Error getting spare status: $e');
+      print('Error getting spare status: $e');
       return {'has_spare': false};
     }
   }
 
-  /// Driver reports they will arrive late from spare duty
   static Future<Map<String, dynamic>> reportDelayedArrival({
     required int scheduleId,
-    required String estimatedArrival, // "HH:MM"
+    required String estimatedArrival,
   }) async {
     try {
-      print('⏰ Reporting delayed arrival...');
-      print('   scheduleId: $scheduleId');
-      print('   estimatedArrival: $estimatedArrival');
-      
       final response = await http.post(
         Uri.parse('${ApiConfig.baseUrl}/api/schedules/spare/delayed/'),
         headers: _headers,
@@ -542,10 +386,6 @@ class ApiService {
           'estimated_arrival': estimatedArrival,
         }),
       );
-
-      print('Report delay response: ${response.statusCode}');
-      print('Response body: ${response.body}');
-
       if (response.statusCode == 200) {
         return json.decode(response.body) as Map<String, dynamic>;
       } else {
@@ -553,24 +393,17 @@ class ApiService {
         throw Exception(decoded['error'] ?? 'Failed to report delay');
       }
     } catch (e) {
-      print('❌ Error reporting delay: $e');
+      print('Error reporting delay: $e');
       rethrow;
     }
   }
 
-  /// Driver exits spare mode
   static Future<Map<String, dynamic>> exitSpareMode() async {
     try {
-      print('🚪 Exiting spare mode...');
-      
       final response = await http.post(
         Uri.parse('${ApiConfig.baseUrl}/api/schedules/spare/exit/'),
         headers: _headers,
       );
-
-      print('Exit spare mode response: ${response.statusCode}');
-      print('Response body: ${response.body}');
-
       if (response.statusCode == 200) {
         return json.decode(response.body) as Map<String, dynamic>;
       } else {
@@ -578,7 +411,7 @@ class ApiService {
         throw Exception(decoded['error'] ?? 'Failed to exit spare mode');
       }
     } catch (e) {
-      print('❌ Error exiting spare mode: $e');
+      print('Error exiting spare mode: $e');
       rethrow;
     }
   }
@@ -587,19 +420,11 @@ class ApiService {
     required int scheduleId,
   }) async {
     try {
-      print('✅ Completing spare trip and checking handoff...');
-      
       final response = await http.post(
         Uri.parse('${ApiConfig.baseUrl}/api/schedules/spare/complete/'),
         headers: _headers,
-        body: json.encode({
-          'schedule_id': scheduleId,
-        }),
+        body: json.encode({'schedule_id': scheduleId}),
       );
-
-      print('Complete spare trip response: ${response.statusCode}');
-      print('Response body: ${response.body}');
-
       if (response.statusCode == 200) {
         return json.decode(response.body) as Map<String, dynamic>;
       } else {
@@ -607,7 +432,79 @@ class ApiService {
         throw Exception(decoded['error'] ?? 'Failed to complete spare trip');
       }
     } catch (e) {
-      print('❌ Error completing spare trip: $e');
+      print('Error completing spare trip: $e');
+      rethrow;
+    }
+  }
+
+  // -----------------------------
+  // Issue Ticket
+  // -----------------------------
+  static Future<Map<String, dynamic>> issueTicket({
+    required int scheduleId,
+    required int boardingStopId,
+    required int dropoffStopId,
+    required int passengerCount,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse(ApiConfig.issueTicket),
+        headers: _headers,
+        body: json.encode({
+          'schedule_id': scheduleId,
+          'boarding_stop_id': boardingStopId,
+          'dropoff_stop_id': dropoffStopId,
+          'passenger_count': passengerCount,
+        }),
+      );
+      print('Issue ticket response: ${response.statusCode}');
+      print('Issue ticket body: ${response.body}');
+      if (response.statusCode == 201) {
+        return json.decode(response.body) as Map<String, dynamic>;
+      } else if (response.statusCode == 401) {
+        throw Exception('Authentication required');
+      } else if (response.statusCode == 403) {
+        throw Exception('Only the assigned driver can issue tickets');
+      } else {
+        final decoded = json.decode(response.body);
+        throw Exception(decoded['error'] ?? 'Failed to issue ticket');
+      }
+    } catch (e) {
+      print('Error issuing ticket: $e');
+      rethrow;
+    }
+  }
+
+  // -----------------------------
+  // Arrived At Stop
+  // -----------------------------
+  static Future<Map<String, dynamic>> arrivedAtStop({
+    required int scheduleId,
+    required int stopId,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse(ApiConfig.arrivedAtStop),
+        headers: _headers,
+        body: json.encode({
+          'schedule_id': scheduleId,
+          'stop_id': stopId,
+        }),
+      );
+      print('Arrived at stop response: ${response.statusCode}');
+      print('Arrived at stop body: ${response.body}');
+      if (response.statusCode == 200) {
+        return json.decode(response.body) as Map<String, dynamic>;
+      } else if (response.statusCode == 401) {
+        throw Exception('Authentication required');
+      } else if (response.statusCode == 403) {
+        throw Exception('Only the assigned driver can update stop');
+      } else {
+        final decoded = json.decode(response.body);
+        throw Exception(decoded['error'] ?? 'Failed to update stop');
+      }
+    } catch (e) {
+      print('Error arriving at stop: $e');
       rethrow;
     }
   }

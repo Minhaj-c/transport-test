@@ -5,6 +5,7 @@ Schedules URL Configuration
 from django.urls import path
 from . import views
 
+
 urlpatterns = [
     # Web pages
     path('schedules/', views.schedules_page, name='schedules-page'),
@@ -24,5 +25,7 @@ urlpatterns = [
     path('api/schedules/spare/delayed/', views.report_delayed_arrival, name='spare-delayed'),
     path('api/schedules/spare/exit/', views.exit_spare_mode, name='spare-exit'),
     path('api/schedules/spare/complete/', views.complete_spare_trip, name='spare-complete'),
+    path('api/schedules/issue-ticket/', views.issue_ticket, name='issue-ticket'),
+    path('api/schedules/arrived-at-stop/', views.arrived_at_stop, name='arrived-at-stop'),   
     
 ]

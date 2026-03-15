@@ -13,7 +13,8 @@ from datetime import timedelta,datetime,time,date
 import math
 from django.views.decorators.csrf import csrf_exempt
 
-from .models import Schedule, Bus
+from .models import Schedule, Bus, Ticket
+from routes.models import Stop
 from .serializers import ScheduleSerializer, LiveBusSerializer, BusLocationSerializer
 from routes.models import Route
 from rest_framework.authentication import SessionAuthentication
@@ -21,12 +22,11 @@ from schedules.models import SpareBusSchedule, SpareDispatchRequest
 from django.db.models import Q
 from django.db import IntegrityError
 from users.models import CustomUser
-
+from django.db import transaction
 
 class CsrfExemptSessionAuthentication(SessionAuthentication):
     """
     SessionAuthentication that skips CSRF checks.
-
     Needed for native/mobile apps that use cookies but can't send CSRF tokens.
     """
     def enforce_csrf(self, request):
@@ -90,6 +90,7 @@ def driver_schedules_view(request):
     schedules = (
         Schedule.objects
         .filter(driver=request.user, date__gte=today)
+        .exclude(status='completed')
         .select_related('route', 'bus')
         .order_by('date', 'departure_time')
     )
@@ -424,10 +425,9 @@ def update_current_stop(request):
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    # 🔒 NEW: don't allow moving the bus backwards
+    # 🔒 don't allow moving the bus backwards
     old_seq = schedule.current_stop_sequence or 0
     if stop_sequence < old_seq:
-        # Ignore backward update – keep existing value
         return Response(
             {
                 "success": False,
@@ -479,6 +479,21 @@ def compute_future_load_for_schedule(schedule):
     )
     current_passengers = schedule.current_passengers or 0
     current_seq = schedule.current_stop_sequence or 0
+    
+    print(f"=== compute_future_load DEBUG ===")
+    print(f"schedule_id: {schedule.id}")
+    print(f"current_seq: {current_seq}")
+    print(f"current_passengers: {schedule.current_passengers}")
+    try:
+        _debug_tickets = Ticket.objects.filter(schedule=schedule).select_related('boarding_stop', 'dropoff_stop')
+        print(f"total tickets: {_debug_tickets.count()}")
+        for _t in _debug_tickets:
+            print(f"  ticket id={_t.id} | boarding_seq={_t.boarding_stop.sequence} | dropoff_seq={_t.dropoff_stop.sequence} | count={_t.passenger_count}")
+        print(f"board_map will be built from above tickets")
+    except Exception as _e:
+        print(f"debug error: {_e}")
+    print(f"=================================")
+    # ===== END DEBUG =====
 
     if capacity is None:
         capacity = 0
@@ -526,7 +541,28 @@ def compute_future_load_for_schedule(schedule):
         print("⚠️ compute_future_load_for_schedule preinform error:", e)
         board_map = {}
         drop_map = {}
+    try:
+        tickets_qs = Ticket.objects.filter(
+            schedule=schedule
+        ).select_related('boarding_stop', 'dropoff_stop')
 
+        for ticket in tickets_qs:
+            b_seq = ticket.boarding_stop.sequence
+            d_seq = ticket.dropoff_stop.sequence
+            count = ticket.passenger_count
+
+            # Future boarding — passenger not yet on bus
+            if b_seq > current_seq:
+                board_map[b_seq] = board_map.get(b_seq, 0) + count
+
+            # Dropoff ahead — covers both:
+            # 1. Already on bus (boarded at or before current stop)
+            # 2. Will board at a future stop
+            if d_seq > current_seq:
+                drop_map[d_seq] = drop_map.get(d_seq, 0) + count
+
+    except Exception as e:
+        print("compute_future_load ticket error:", e)
     # 🔥 For spare buses starting mid-route, begin with 0 passengers
     if getattr(schedule, 'is_spare_trip', False):
         running_load = 0  # Spare bus starts empty
@@ -571,8 +607,10 @@ def compute_future_load_for_schedule(schedule):
         },
         "capacity": capacity,
         "current_stop_sequence": current_seq,
+        "start_stop_sequence": getattr(schedule, 'starting_stop_sequence', 0) or 0,
+        "end_stop_sequence": stops_output[-1]["sequence"] if stops_output else None,
         "current_passengers": current_passengers,
-        "is_spare_trip": getattr(schedule, 'is_spare_trip', False),  # 🔥 NEW
+        "is_spare_trip": getattr(schedule, 'is_spare_trip', False),
         "future_stops": stops_output,
         "will_overflow": will_overflow,
         "overflow_from_stop_sequence": overflow_from_stop_seq,
@@ -608,14 +646,16 @@ def schedule_forecast_view(request, schedule_id):
     return Response(forecast, status=status.HTTP_200_OK)
 
 
+# ==========================
+#  SPARE BUS APIs
+# ==========================
+
 @api_view(['POST'])
 @authentication_classes([CsrfExemptSessionAuthentication])
 def enter_spare_mode(request):
     """
     Driver enters spare mode (activates their spare window).
     POST /api/schedules/spare/enter/
-    
-    ✅ FIXED: Only drivers with assigned spare schedules can activate
     """
     user = request.user
     
@@ -642,11 +682,11 @@ def enter_spare_mode(request):
 
     bus = today_schedule.bus
 
-    # 🔥 KEY CHECK: Find spare schedule for THIS SPECIFIC bus
+    # Find spare schedule for THIS SPECIFIC bus
     spare = SpareBusSchedule.objects.filter(
         bus=bus,
         date=today,
-        status='waiting'  # Only waiting spares can be activated
+        status='waiting'
     ).first()
 
     if not spare:
@@ -655,12 +695,10 @@ def enter_spare_mode(request):
             status=status.HTTP_404_NOT_FOUND
         )
 
-    # ✅ This driver HAS a spare schedule, allow activation
     spare.status = 'active'
     spare.activated_at = now
     spare.save()
 
-    # Calculate remaining time
     remaining_minutes = spare.remaining_minutes
 
     return Response({
@@ -682,14 +720,12 @@ def get_spare_status(request):
     user = request.user
     today = timezone.now().date()
 
-    # Check authentication
     if not user.is_authenticated:
         return Response({
             'has_spare': False, 
             'message': 'Not logged in'
         })
 
-    # Find driver's bus from today's schedule
     today_schedule = Schedule.objects.filter(
         driver=user,
         date=today
@@ -701,7 +737,6 @@ def get_spare_status(request):
             'message': 'No schedule today'
         })
 
-    # Find spare schedule for this bus
     spare = SpareBusSchedule.objects.filter(
         bus=today_schedule.bus,
         date=today
@@ -710,7 +745,6 @@ def get_spare_status(request):
     if not spare:
         return Response({'has_spare': False})
 
-    # Return spare info
     return Response({
         'has_spare': True,
         'spare_id': spare.id,
@@ -731,8 +765,6 @@ def request_spare_bus(request):
     Request spare bus for a schedule.
     POST /api/schedules/spare/request/
     Body: {"schedule_id": 12, "reason": "Bus breakdown"}
-    
-    FIXED: Only shows buses that are ACTIVE in spare mode
     """
     schedule_id = request.data.get('schedule_id')
     reason = request.data.get('reason', 'Spare bus requested')
@@ -748,11 +780,10 @@ def request_spare_bus(request):
     today = timezone.now().date()
     now = timezone.now()
 
-    # 🔥 FIX: Find ONLY buses in ACTIVE spare mode (driver clicked Enter Spare Mode)
     available_spares = SpareBusSchedule.objects.filter(
         date=today,
-        status='active',  # Must be active (driver clicked button)
-        spare_end_time__gt=now.time()  # Still within window
+        status='active',
+        spare_end_time__gt=now.time()
     ).select_related('bus').order_by('spare_end_time')
 
     if not available_spares.exists():
@@ -766,7 +797,6 @@ def request_spare_bus(request):
             status=status.HTTP_404_NOT_FOUND
         )
 
-    # Pick best (most remaining time)
     best_spare = None
     best_remaining = -1
     for spare in available_spares:
@@ -781,15 +811,11 @@ def request_spare_bus(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # 🔥 FIX: Use bus's assigned driver (don't ask for driver)
-    # First try to get driver from spare bus
     spare_driver = None
     
-    # Option 1: Check if bus has assigned_driver field
     if hasattr(best_spare.bus, 'assigned_driver') and best_spare.bus.assigned_driver:
         spare_driver = best_spare.bus.assigned_driver
     
-    # Option 2: Find driver from today's schedules for this bus
     if not spare_driver:
         today_schedule = Schedule.objects.filter(
             bus=best_spare.bus,
@@ -799,15 +825,13 @@ def request_spare_bus(request):
         if today_schedule:
             spare_driver = today_schedule.driver
     
-    # Option 3: Use original schedule's driver as fallback
     if not spare_driver:
         spare_driver = original_schedule.driver
 
-    # Create spare schedule
     spare_schedule = Schedule.objects.create(
         bus=best_spare.bus,
         route=original_schedule.route,
-        driver=spare_driver,  # Use found driver
+        driver=spare_driver,
         date=today,
         departure_time=original_schedule.departure_time,
         arrival_time=original_schedule.arrival_time,
@@ -816,13 +840,11 @@ def request_spare_bus(request):
         is_spare_trip=True,
     )
 
-    # Update spare status
     best_spare.status = 'dispatched'
     best_spare.dispatched_to_schedule = spare_schedule
     best_spare.dispatched_at = now
     best_spare.save()
 
-    # Create dispatch record
     SpareDispatchRequest.objects.create(
         original_schedule=original_schedule,
         assigned_spare=best_spare,
@@ -848,8 +870,7 @@ def request_spare_bus(request):
 def report_delayed_arrival(request):
     """
     Driver reports they will be late returning from spare duty.
-    
-    🔥 FIXED: Proper datetime comparison for time checking
+    POST /api/schedules/spare/delayed/
     """
     user = request.user
     
@@ -868,7 +889,6 @@ def report_delayed_arrival(request):
             status=status.HTTP_400_BAD_REQUEST
         )
     
-    # Get current spare trip
     try:
         current_schedule = Schedule.objects.select_related('bus', 'driver', 'route').get(id=schedule_id)
     except Schedule.DoesNotExist:
@@ -877,7 +897,6 @@ def report_delayed_arrival(request):
             status=status.HTTP_404_NOT_FOUND
         )
     
-    # Parse estimated arrival time
     try:
         arrival_time = datetime.strptime(estimated_arrival, '%H:%M').time()
     except ValueError:
@@ -889,12 +908,11 @@ def report_delayed_arrival(request):
     now = timezone.now()
     today = now.date()
     
-    # Find next scheduled trip AFTER current spare trip
     next_schedule = Schedule.objects.filter(
         bus=current_schedule.bus,
         date=today,
         departure_time__gt=current_schedule.departure_time,
-        is_spare_trip=False  # Only regular trips
+        is_spare_trip=False
     ).order_by('departure_time').first()
     
     if not next_schedule:
@@ -903,27 +921,22 @@ def report_delayed_arrival(request):
             'message': f'✅ No trips scheduled after this spare duty.',
         })
     
-    # 🔥 FIXED TIME COMPARISON - Convert to datetime for proper comparison
     arrival_datetime = datetime.combine(today, arrival_time)
     next_trip_datetime = datetime.combine(today, next_schedule.departure_time)
     time_diff = (arrival_datetime - next_trip_datetime).total_seconds() / 60
     
     print(f"🔍 Time check: Arrive {arrival_time} vs Next trip {next_schedule.departure_time} = {time_diff:.1f} min")
     
-    # If positive = LATE, if negative or zero = ON TIME
     if time_diff <= 0:
-        # On time
         print(f"✅ Driver is ON TIME (early by {abs(time_diff):.1f} min)")
         return Response({
             'can_make_it': True,
             'message': f'✅ You will arrive at {estimated_arrival}, in time for {next_schedule.departure_time.strftime("%H:%M")} trip.',
         })
     
-    # LATE - need spare bus
     minutes_late = int(time_diff)
     print(f"❌ Driver late by {minutes_late} minutes - finding spare...")
     
-    # Find available spares
     available_spares = SpareBusSchedule.objects.filter(
         date=today,
         status='active',
@@ -948,7 +961,6 @@ def report_delayed_arrival(request):
     
     print(f"✅ Found spare: {best_spare.bus.number_plate} ({best_spare.remaining_minutes} min)")
     
-    # Get driver for backup bus
     spare_bus_driver = CustomUser.objects.filter(
         role='driver'
     ).exclude(id=user.id).first()
@@ -956,7 +968,6 @@ def report_delayed_arrival(request):
     if not spare_bus_driver:
         spare_bus_driver = user
     
-    # Check if backup already exists
     existing_backup = Schedule.objects.filter(
         driver=spare_bus_driver,
         date=today,
@@ -973,7 +984,6 @@ def report_delayed_arrival(request):
             'backup_bus': best_spare.bus.number_plate,
         })
     
-    # CREATE BACKUP SCHEDULE
     try:
         backup_schedule = Schedule.objects.create(
             bus=best_spare.bus,
@@ -994,17 +1004,14 @@ def report_delayed_arrival(request):
             'error': f'Schedule already exists for this time slot.',
         }, status=400)
     
-    # Update spare status
     best_spare.status = 'dispatched'
     best_spare.dispatched_to_schedule = backup_schedule
     best_spare.dispatched_at = now
     best_spare.save()
     
-    # Mark original as covered
     next_schedule.status = 'covered_by_spare'
     next_schedule.save()
     
-    # CREATE HANDOFF
     handoff_message = ""
     
     backup_bus_next_trip = Schedule.objects.filter(
@@ -1083,7 +1090,6 @@ def exit_spare_mode(request):
     
     today = timezone.now().date()
 
-    # Find driver's bus
     today_schedule = Schedule.objects.filter(
         driver=user,
         date=today
@@ -1097,7 +1103,6 @@ def exit_spare_mode(request):
 
     bus = today_schedule.bus
 
-    # Find spare schedule
     spare = SpareBusSchedule.objects.filter(
         bus=bus,
         date=today,
@@ -1110,7 +1115,6 @@ def exit_spare_mode(request):
             status=status.HTTP_404_NOT_FOUND
         )
 
-    # Deactivate
     spare.status = 'completed'
     spare.save()
 
@@ -1140,19 +1144,15 @@ def complete_spare_trip(request):
     except Schedule.DoesNotExist:
         return Response({'error': 'Schedule not found'}, status=404)
     
-    # Verify this is a spare trip
     if not schedule.is_spare_trip:
         return Response({'error': 'Not a spare trip'}, status=400)
     
-    # Verify driver matches
     if schedule.driver.id != user.id:
         return Response({'error': 'Not your schedule'}, status=403)
     
     today = timezone.now().date()
     now_time = timezone.now().time()
     
-    # 🔥 CHECK FOR HANDOFF SCHEDULE
-    # Look for any spare trip assigned to this bus for later today
     handoff_schedule = Schedule.objects.filter(
         bus=schedule.bus,
         driver=user,
@@ -1183,4 +1183,208 @@ def complete_spare_trip(request):
         'success': True,
         'has_handoff': False,
         'message': '✅ Spare trip completed! No additional assignments.',
+    })
+
+
+# ==========================
+#  TICKET APIs
+# ==========================
+
+@api_view(['POST'])
+@authentication_classes([CsrfExemptSessionAuthentication])  # ✅ FIXES mobile session auth
+@permission_classes([IsAuthenticated])
+def issue_ticket(request):
+    """
+    Conductor issues a ticket when passengers board.
+
+    POST /api/schedules/issue-ticket/
+    {
+        "schedule_id": 10,
+        "boarding_stop_id": 3,
+        "dropoff_stop_id": 7,
+        "passenger_count": 5
+    }
+    """
+    schedule_id     = request.data.get('schedule_id')
+    boarding_id     = request.data.get('boarding_stop_id')
+    dropoff_id      = request.data.get('dropoff_stop_id')
+    passenger_count = int(request.data.get('passenger_count', 1))
+
+    if not all([schedule_id, boarding_id, dropoff_id]):
+        return Response(
+            {'error': 'schedule_id, boarding_stop_id and dropoff_stop_id are required.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if passenger_count < 1:
+        return Response(
+            {'error': 'passenger_count must be at least 1.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        schedule = Schedule.objects.select_related('route', 'bus').get(id=schedule_id)
+    except Schedule.DoesNotExist:
+        return Response(
+            {'error': 'Schedule not found.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # ✅ Compare by ID + superuser bypass
+    if schedule.driver_id != request.user.id and not request.user.is_superuser:
+        return Response(
+            {'error': 'Only the assigned driver can issue tickets for this schedule.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    try:
+        boarding_stop = Stop.objects.get(id=boarding_id, route=schedule.route)
+    except Stop.DoesNotExist:
+        return Response(
+            {'error': 'Boarding stop not found on this route.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        dropoff_stop = Stop.objects.get(id=dropoff_id, route=schedule.route)
+    except Stop.DoesNotExist:
+        return Response(
+            {'error': 'Dropoff stop not found on this route.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if boarding_stop.sequence >= dropoff_stop.sequence:
+        return Response(
+            {'error': 'Dropoff stop must be after boarding stop.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    with transaction.atomic():
+        Ticket.objects.create(
+            schedule=schedule,
+            boarding_stop=boarding_stop,
+            dropoff_stop=dropoff_stop,
+            passenger_count=passenger_count,
+        )
+        # ✅ Use set_passenger_count to keep current_passengers + available_seats in sync
+        new_count = (schedule.current_passengers or 0) + passenger_count
+        schedule.set_passenger_count(new_count)
+
+    return Response({
+        'success': True,
+        'message': f'Ticket issued for {passenger_count} passenger(s).',
+        'ticket': {
+            'boarding_stop':   boarding_stop.name,
+            'dropoff_stop':    dropoff_stop.name,
+            'passenger_count': passenger_count,
+        },
+        'schedule': {
+            'id':                 schedule.id,
+            'current_passengers': schedule.current_passengers,
+            'total_seats':        schedule.total_seats,
+            'available_seats':    schedule.available_seats,
+        }
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@authentication_classes([CsrfExemptSessionAuthentication])
+@permission_classes([IsAuthenticated])
+def arrived_at_stop(request):
+    """
+    Driver marks bus as arrived at a stop.
+    Auto-decrements passengers whose dropoff is this stop.
+
+    POST /api/schedules/arrived-at-stop/
+    {
+        "schedule_id": 10,
+        "stop_id": 7
+    }
+    """
+    schedule_id = request.data.get('schedule_id')
+    stop_id     = request.data.get('stop_id')
+
+    if not all([schedule_id, stop_id]):
+        return Response(
+            {'error': 'schedule_id and stop_id are required.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        schedule = Schedule.objects.select_related('route').get(id=schedule_id)
+    except Schedule.DoesNotExist:
+        return Response(
+            {'error': 'Schedule not found.'},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    if schedule.driver_id != request.user.id and not request.user.is_superuser:
+        return Response(
+            {'error': 'Only the assigned driver can update stop.'},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
+    try:
+        stop = Stop.objects.get(id=stop_id, route=schedule.route)
+    except Stop.DoesNotExist:
+        return Response(
+            {'error': 'Stop not found on this route.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # ✅ BACKWARD GUARD — same as updateCurrentStop
+    old_seq = schedule.current_stop_sequence or 0
+    if stop.sequence < old_seq:
+        return Response(
+            {
+                'success': False,
+                'message': (
+                    f'Ignored: stop sequence {stop.sequence} '
+                    f'is less than current {old_seq}.'
+                ),
+                'current_stop_sequence': old_seq,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    all_stops       = list(schedule.route.stops.order_by('sequence'))
+    is_last_stop    = stop.sequence == all_stops[-1].sequence
+    alighting_count = 0
+    
+    
+
+    with transaction.atomic():
+        schedule.current_stop_sequence = stop.sequence
+        schedule.save(update_fields=['current_stop_sequence'])
+
+        # Auto-decrement passengers alighting at this stop
+        alighting_tickets = Ticket.objects.filter(
+            schedule=schedule,
+            dropoff_stop__sequence=stop.sequence,
+        )
+        alighting_count = sum(t.passenger_count for t in alighting_tickets)
+
+        if alighting_count > 0:
+            new_count = max(0, (schedule.current_passengers or 0) - alighting_count)
+            schedule.set_passenger_count(new_count)
+
+        # Reset everything at last stop
+        if is_last_stop:
+            schedule.set_passenger_count(0)
+            schedule.current_stop_sequence = 0
+            schedule.status = 'completed'
+            schedule.save(update_fields=['current_stop_sequence','status'])
+
+    return Response({
+        'success':            True,
+        'stop': {
+            'id':       stop.id,
+            'name':     stop.name,
+            'sequence': stop.sequence,
+        },
+        'alighted':           alighting_count,
+        'current_passengers': schedule.current_passengers,
+        'available_seats':    schedule.available_seats,
+        'is_last_stop':       is_last_stop,
+        'route_complete':     is_last_stop,
     })

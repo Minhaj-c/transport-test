@@ -21,6 +21,7 @@ from rest_framework.permissions import IsAuthenticated
 from datetime import datetime
 
 
+
 @api_view(['GET'])
 def api_welcome(request):
     """

@@ -44,5 +44,9 @@ class ApiConfig {
 
 
   static String routeLiveStatus(int routeId) =>
-      '$baseUrl/api/routes/$routeId/live-status/';    
+      '$baseUrl/api/routes/$routeId/live-status/';   
+
+  static const String issueTicket = '$baseUrl/api/schedules/issue-ticket/';
+
+  static const String arrivedAtStop = '$baseUrl/api/schedules/arrived-at-stop/';     
 }

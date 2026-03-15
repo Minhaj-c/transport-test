@@ -473,3 +473,39 @@ class SpareDispatchRequest(models.Model):
         return f"Spare request for Schedule #{self.original_schedule.id} - {self.status}"
 
 
+class Ticket(models.Model):
+    """
+    Ticket issued by conductor when passengers board.
+    Tracks boarding → dropoff + passenger count.
+    Auto-decrements passengers when bus reaches dropoff stop.
+    """
+    schedule = models.ForeignKey(
+        'Schedule',
+        on_delete=models.CASCADE,
+        related_name='tickets',
+    )
+    boarding_stop = models.ForeignKey(
+        'routes.Stop',
+        on_delete=models.CASCADE,
+        related_name='boarding_tickets',
+    )
+    dropoff_stop = models.ForeignKey(
+        'routes.Stop',
+        on_delete=models.CASCADE,
+        related_name='dropoff_tickets',
+    )
+    passenger_count = models.PositiveIntegerField(
+        default=1,
+        help_text="Number of passengers on this ticket"
+    )
+    issued_at = models.DateTimeField(auto_now_add=True)
+ 
+    class Meta:
+        ordering = ['-issued_at']
+ 
+    def __str__(self):
+        return (
+            f"{self.passenger_count} pax | "
+            f"{self.boarding_stop.name} → {self.dropoff_stop.name} | "
+            f"Schedule #{self.schedule_id}"
+        )
