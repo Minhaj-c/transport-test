@@ -1258,6 +1258,12 @@ def issue_ticket(request):
             {'error': 'Dropoff stop must be after boarding stop.'},
             status=status.HTTP_400_BAD_REQUEST,
         )
+    current_seq = schedule.current_stop_sequence or 0
+    if dropoff_stop.sequence < current_seq:
+        return Response(
+            {'error' : f'DropOff dtop "{dropoff_stop.name}" is already passed. Bus is currently at stop {current_seq}'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )    
 
     with transaction.atomic():
         Ticket.objects.create(
