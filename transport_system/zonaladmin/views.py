@@ -445,8 +445,7 @@ def zonal_demand_alerts(request):
 def dispatch_spare_bus(request, alert_id):
     """
     Dispatch spare bus with AUTO-DRIVER assignment.
-    Admin only selects: bus, date, departure time.
-    Driver is automatically assigned from bus.permanent_driver.
+    Shows only buses currently in their spare time window.
     """
     user = request.user
  
@@ -461,7 +460,7 @@ def dispatch_spare_bus(request, alert_id):
             return redirect("zonal-demand")
  
     route = alert.stop.route
-    overflow_stop = alert.stop  # Where the overflow occurs
+    overflow_stop = alert.stop
     
     # Default date: alert creation date (or today fallback)
     alert_date = getattr(alert, "created_at", None)
@@ -470,10 +469,24 @@ def dispatch_spare_bus(request, alert_id):
     else:
         selected_date = timezone.localdate()
  
-    # Candidate spare buses: active & currently not running
+    # 🔥 Get current time
+    current_time = timezone.localtime().time()
+    
+    # 🔥 Find buses currently in their spare time window
+    spare_schedules = SpareBusSchedule.objects.filter(
+        date=selected_date,
+        spare_start_time__lte=current_time,
+        spare_end_time__gte=current_time,
+        status='active'
+    ).select_related('bus')
+    
+    # Get the bus IDs from spare schedules
+    spare_bus_ids = [s.bus_id for s in spare_schedules]
+    
+    # 🔥 Candidate spare buses: active & currently in spare window
     buses = Bus.objects.filter(
-        is_active=True, 
-        is_running=False
+        id__in=spare_bus_ids,
+        is_active=True
     ).order_by("number_plate")
  
     # Remaining stops from overflow point
@@ -516,7 +529,6 @@ def dispatch_spare_bus(request, alert_id):
             bus_obj = get_object_or_404(Bus, id=bus_id)
             
             # AUTO-ASSIGN DRIVER from bus.permanent_driver
-            # Use .first() to get actual CustomUser object from RelatedManager
             driver_obj = bus_obj.permanent_driver.first()
             
             if not driver_obj:
@@ -525,7 +537,6 @@ def dispatch_spare_bus(request, alert_id):
                     f"Please assign a driver to this bus first in the Driver Management page."
                 )
             else:
- 
                 # Check if schedule already exists
                 existing_schedule = Schedule.objects.filter(
                     bus=bus_obj,
@@ -540,11 +551,11 @@ def dispatch_spare_bus(request, alert_id):
                         f"Choose a different time or bus."
                     )
                 else:
-                    # Create the spare schedule starting from overflow stop
+                    # Create the spare schedule
                     schedule = Schedule.objects.create(
                         route=route,
                         bus=bus_obj,
-                        driver=driver_obj,  # AUTO-ASSIGNED!
+                        driver=driver_obj,
                         date=sched_date,
                         departure_time=departure_time,
                         arrival_time=arrival_time or departure_time,
@@ -556,17 +567,16 @@ def dispatch_spare_bus(request, alert_id):
                         source_alert=alert,
                     )
  
-                    # Mark bus as running
-                    bus_obj.is_running = True
-                    bus_obj.current_route = route
-                    bus_obj.current_schedule = schedule
-                    bus_obj.save(
-                        update_fields=[
-                            "is_running",
-                            "current_route",
-                            "current_schedule",
-                        ]
-                    )
+                    # 🔥 Mark spare schedule as dispatched
+                    spare_assignment = SpareBusSchedule.objects.filter(
+                        bus=bus_obj,
+                        date=sched_date,
+                        status='active'
+                    ).first()
+                    
+                    if spare_assignment:
+                        spare_assignment.status = 'dispatched'
+                        spare_assignment.save()
  
                     # Update alert status & notes
                     if hasattr(alert, "status"):
@@ -592,7 +602,6 @@ def dispatch_spare_bus(request, alert_id):
                         f"✅ Spare bus {bus_obj.number_plate} dispatched with driver {driver_obj.get_full_name()}!"
                     )
                     
-                    # Back to demand list
                     return redirect("zonal-demand")
  
     # Default suggested departure time = now (HH:MM)
@@ -605,9 +614,11 @@ def dispatch_spare_bus(request, alert_id):
         "overflow_stop": overflow_stop,
         "remaining_stops": remaining_stops,
         "selected_date": selected_date,
-        "buses": buses,  # Now includes permanent_driver info
+        "buses": buses,
         "initial_departure": initial_departure,
         "error": error,
+        "current_time": current_time,  # For display
+        "spare_count": buses.count(),  # Show how many buses available
     }
  
     return render(request, "zonaladmin/dispatch_spare_bus.html", context)

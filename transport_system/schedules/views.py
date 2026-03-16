@@ -1062,11 +1062,11 @@ def report_delayed_arrival(request):
         'success': True,
         'spare_bus_assigned': True,
         'message': (
-            f"⚡ Spare bus {best_spare.bus.number_plate} will cover your "
+            f"⚡ Spare bus {backup_schedule.bus.number_plate} will cover your "
             f"{next_schedule.departure_time.strftime('%H:%M')} trip on Route {next_schedule.route.number}."
             f"{handoff_message}"
         ),
-        'backup_bus': best_spare.bus.number_plate,
+        'backup_bus': backup_schedule.bus.number_plate,
         'covered_trip_time': next_schedule.departure_time.strftime('%H:%M'),
         'your_arrival': estimated_arrival,
         'minutes_late': minutes_late,
