@@ -353,6 +353,7 @@
                     <th>Type</th>
                     <th>Starting Point</th>
                     <th>Actions</th>
+                    <th>Status</th>
                 </tr>
             </thead>
             <tbody id="schedule-tbody">
@@ -391,7 +392,19 @@
                             <span class="start-point-origin">Origin</span>
                         {% endif %}
                     </td>
-
+                    <td>
+                        {% if s.status == 'completed' %}
+                            <span class="tag" style="background:rgba(139,148,158,0.1);border:1px solid rgba(139,148,158,0.3);color:#8b949e;">✓ Completed</span>
+                        {% elif s.status == 'running' %}
+                            <span class="tag" style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);color:#3fb950;">🟢 Running</span>
+                        {% elif s.status == 'covered_by_spare' %}
+                            <span class="tag" style="background:rgba(249,115,22,0.1);border:1px solid rgba(249,115,22,0.3);color:#f97316;">🔄 Covered</span>
+                        {% elif s.status == 'cancelled' %}
+                            <span class="tag" style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);color:#f85149;">✕ Cancelled</span>
+                        {% else %}
+                            <span class="tag" style="background:rgba(31,111,235,0.1);border:1px solid rgba(31,111,235,0.3);color:#79c0ff;">📅 Scheduled</span>
+                        {% endif %}
+                    </td>
                     <!-- Actions -->
                     <td>
                         <a href="{% url 'verify-schedule' s.id %}" class="action-link">🔍 Verify</a>
