@@ -19,6 +19,7 @@ from users.models import CustomUser
 from decimal import Decimal
 from django.db import models
 from django.contrib.auth.hashers import make_password
+from schedules.models import SpareBusSchedule
 
 # Alert engines – ONLY these (❌ no build_prediction_alerts_for_ui)
 from zonaladmin.logic.alert_engine import (
@@ -1967,3 +1968,162 @@ def edit_driver(request, driver_id):
     }
     
     return render(request, "zonaladmin/edit_driver.html", context)
+
+@login_required
+def spare_bus_management(request):
+    """
+    Spare bus time scheduler page.
+    Create spare duty windows for buses (just time management, no dispatch).
+    """
+    user = request.user
+    
+    # Only admin and zonal_admin can manage spare buses
+    if not (user.is_superuser or getattr(user, "role", None) in ["admin", "zonal_admin"]):
+        messages.error(request, "Permission denied.")
+        return redirect("zonal-dashboard")
+    
+    today = timezone.localdate()
+    
+    # Get all buses
+    buses = Bus.objects.filter(is_active=True).order_by('number_plate')
+    
+    # Get spare assignments (today onwards)
+    spare_schedules = SpareBusSchedule.objects.filter(
+        date__gte=today
+    ).select_related('bus').order_by('date', 'spare_start_time')
+    
+    # Calculate duration for each spare schedule
+    for spare in spare_schedules:
+        if spare.spare_start_time and spare.spare_end_time:
+            start_dt = datetime.combine(spare.date, spare.spare_start_time)
+            end_dt = datetime.combine(spare.date, spare.spare_end_time)
+            duration = (end_dt - start_dt).total_seconds() / 3600
+            spare.duration_hours = round(duration, 1)
+        else:
+            spare.duration_hours = 0
+    
+    context = {
+        "user": user,
+        "today": today,
+        "buses": buses,
+        "spare_schedules": spare_schedules,
+    }
+    
+    return render(request, "zonaladmin/spare_bus_management.html", context)
+ 
+ 
+@login_required
+def create_spare_assignment(request):
+    """
+    Create a spare time window for a bus.
+    """
+    user = request.user
+    
+    if not (user.is_superuser or getattr(user, "role", None) in ["admin", "zonal_admin"]):
+        messages.error(request, "Permission denied.")
+        return redirect("spare-bus-management")
+    
+    if request.method != "POST":
+        return redirect("spare-bus-management")
+    
+    bus_id = request.POST.get("bus_id")
+    date_str = request.POST.get("date")
+    spare_start_time_str = request.POST.get("spare_start_time")
+    spare_end_time_str = request.POST.get("spare_end_time")
+    
+    if not all([bus_id, date_str, spare_start_time_str, spare_end_time_str]):
+        messages.error(request, "All fields are required.")
+        return redirect("spare-bus-management")
+    
+    try:
+        spare_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+        spare_start = datetime.strptime(spare_start_time_str, "%H:%M").time()
+        spare_end = datetime.strptime(spare_end_time_str, "%H:%M").time()
+        
+        if spare_date < timezone.localdate():
+            messages.error(request, "Cannot create spare time for past dates.")
+            return redirect("spare-bus-management")
+        
+        if spare_end <= spare_start:
+            messages.error(request, "End time must be after start time.")
+            return redirect("spare-bus-management")
+        
+        bus = Bus.objects.get(id=bus_id)
+        
+        # Check if duplicate exists
+        existing = SpareBusSchedule.objects.filter(
+            bus=bus,
+            date=spare_date,
+            status__in=['waiting', 'active']
+        ).first()
+        
+        if existing:
+            messages.error(
+                request,
+                f"Bus {bus.number_plate} already has spare duty on {spare_date}."
+            )
+            return redirect("spare-bus-management")
+        
+        # Create spare time window
+        SpareBusSchedule.objects.create(
+            bus=bus,
+            date=spare_date,
+            spare_start_time=spare_start,
+            spare_end_time=spare_end,
+            status='waiting'
+        )
+        
+        messages.success(
+            request,
+            f"✅ Spare time created: {bus.number_plate} on {spare_date} "
+            f"from {spare_start} to {spare_end}!"
+        )
+        
+    except Bus.DoesNotExist:
+        messages.error(request, "Bus not found.")
+    except ValueError as e:
+        messages.error(request, f"Invalid date or time: {str(e)}")
+    except Exception as e:
+        messages.error(request, f"Error: {str(e)}")
+    
+    return redirect("spare-bus-management")
+ 
+ 
+@login_required
+def delete_spare_assignment(request, spare_id):
+    """
+    Delete a spare time window.
+    """
+    user = request.user
+    
+    if not (user.is_superuser or getattr(user, "role", None) in ["admin", "zonal_admin"]):
+        messages.error(request, "Permission denied.")
+        return redirect("spare-bus-management")
+    
+    if request.method != "POST":
+        return redirect("spare-bus-management")
+    
+    try:
+        spare = SpareBusSchedule.objects.get(id=spare_id)
+        
+        if spare.status == 'dispatched':
+            messages.error(request, "Cannot delete dispatched spare time.")
+            return redirect("spare-bus-management")
+        
+        if spare.status == 'completed':
+            messages.error(request, "Cannot delete completed spare time.")
+            return redirect("spare-bus-management")
+        
+        bus_name = spare.bus.number_plate
+        spare_date = spare.date
+        
+        spare.delete()
+        
+        messages.success(request, f"✅ Deleted spare time for {bus_name} on {spare_date}.")
+        
+    except SpareBusSchedule.DoesNotExist:
+        messages.error(request, "Spare time not found.")
+    except Exception as e:
+        messages.error(request, f"Error: {str(e)}")
+    
+    return redirect("spare-bus-management")

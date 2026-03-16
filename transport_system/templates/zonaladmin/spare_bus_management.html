@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Spare Bus Schedule – Zonal Admin</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+            font-family: 'IBM Plex Sans', sans-serif;
+            margin: 0;
+            background: #0d1117;
+            color: #e6edf3;
+            min-height: 100vh;
+        }
+
+        /* ── Header ── */
+        .header {
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header-left { 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+        }
+        .header-logo {
+            width: 32px; 
+            height: 32px;
+            background: #1f6feb;
+            border-radius: 8px;
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            font-size: 16px;
+        }
+        .header h2 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: #e6edf3;
+        }
+        .header small {
+            font-size: 13px;
+            color: #8b949e;
+            margin-left: 8px;
+        }
+        .header-nav { 
+            display: flex; 
+            gap: 4px; 
+        }
+        .header-nav a {
+            color: #8b949e;
+            text-decoration: none;
+            font-size: 13px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            transition: background 0.15s, color 0.15s;
+        }
+        .header-nav a:hover { 
+            background: #21262d; 
+            color: #e6edf3; 
+        }
+
+        /* ── Container ── */
+        .container { 
+            max-width: 1200px;
+            margin: 24px auto;
+            padding: 0 32px; 
+        }
+
+        /* ── Page Title ── */
+        .page-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin: 0 0 8px;
+        }
+        .page-subtitle {
+            font-size: 14px;
+            color: #8b949e;
+            margin: 0 0 32px;
+        }
+
+        /* ── Card ── */
+        .card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+        .card-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #30363d;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .card-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #e6edf3;
+        }
+        .card-content {
+            padding: 20px;
+        }
+
+        /* ── Form ── */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .form-field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .form-field label {
+            font-size: 13px;
+            color: #8b949e;
+            font-weight: 500;
+        }
+        .form-field input,
+        .form-field select {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 14px;
+            color: #e6edf3;
+            font-family: 'IBM Plex Sans', sans-serif;
+        }
+        .form-field input:focus,
+        .form-field select:focus {
+            outline: none;
+            border-color: #1f6feb;
+        }
+        .form-field small {
+            font-size: 12px;
+            color: #6e7681;
+        }
+
+        /* ── Buttons ── */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            border: 1px solid;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-decoration: none;
+        }
+        .btn-primary {
+            background: #238636;
+            color: #fff;
+            border-color: #2ea043;
+        }
+        .btn-primary:hover {
+            background: #2ea043;
+        }
+        .btn-danger {
+            background: #da3633;
+            color: #fff;
+            border-color: #f85149;
+        }
+        .btn-danger:hover {
+            background: #f85149;
+        }
+
+        /* ── Table ── */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        th {
+            background: #0d1117;
+            padding: 10px 12px;
+            text-align: left;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #8b949e;
+            border-bottom: 1px solid #30363d;
+        }
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #21262d;
+            color: #c9d1d9;
+        }
+        tr:hover td {
+            background: #1c2128;
+        }
+
+        /* ── Badge ── */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            font-size: 11px;
+            border-radius: 999px;
+            font-weight: 500;
+            border: 1px solid;
+        }
+        .badge-active {
+            background: rgba(63, 185, 80, 0.1);
+            border-color: rgba(63, 185, 80, 0.3);
+            color: #3fb950;
+        }
+        .badge-waiting {
+            background: rgba(249, 115, 22, 0.1);
+            border-color: rgba(249, 115, 22, 0.3);
+            color: #f97316;
+        }
+        .badge-completed {
+            background: rgba(31, 111, 235, 0.1);
+            border-color: rgba(31, 111, 235, 0.3);
+            color: #1f6feb;
+        }
+
+        /* ── Mono Text ── */
+        .mono {
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        /* ── Alert ── */
+        .alert {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 13px;
+        }
+        .alert-success {
+            background: rgba(63, 185, 80, 0.1);
+            border: 1px solid rgba(63, 185, 80, 0.3);
+            color: #3fb950;
+        }
+        .alert-error {
+            background: rgba(248, 81, 73, 0.1);
+            border: 1px solid rgba(248, 81, 73, 0.3);
+            color: #f85149;
+        }
+        .alert-info {
+            background: rgba(31, 111, 235, 0.1);
+            border: 1px solid rgba(31, 111, 235, 0.3);
+            color: #1f6feb;
+        }
+
+        /* ── Empty State ── */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #6e7681;
+        }
+        .empty-icon {
+            font-size: 32px;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="header-left">
+        <div class="header-logo">🚑</div>
+        <h2>Spare Bus Schedule</h2>
+        <small>Set spare duty time windows for buses</small>
+    </div>
+    <nav class="header-nav">
+        <a href="/zonal-admin/">Dashboard</a>
+        <a href="/zonal-admin/buses/">Buses</a>
+        <a href="/zonal-admin/drivers/">Drivers</a>
+        <a href="/zonal-admin/stops/">Stops</a>
+        <a href="/zonal-admin/weekly-profit/">Weekly Profit</a>
+        <a href="/zonal-admin/schedule-generator/">Generator</a>
+    </nav>
+</div>
+
+<div class="container">
+
+    <h1 class="page-title">⚡ Spare Bus Time Scheduler</h1>
+    <p class="page-subtitle">
+        Assign buses to spare duty windows - when they're available for emergency use
+    </p>
+
+    <!-- Messages -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Create Spare Time Form -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">➕ Create Spare Time Window</h3>
+        </div>
+        <div class="card-content">
+            <form method="post" action="{% url 'create-spare-assignment' %}">
+                {% csrf_token %}
+                
+                <div class="form-grid">
+                    <div class="form-field">
+                        <label for="bus_id">Bus *</label>
+                        <select name="bus_id" id="bus_id" required>
+                            <option value="">-- Select Bus --</option>
+                            {% for bus in buses %}
+                                <option value="{{ bus.id }}">
+                                    {{ bus.number_plate }} ({{ bus.capacity }} seats)
+                                    {% if bus.permanent_driver.first %}
+                                        – Driver: {{ bus.permanent_driver.first.get_full_name }}
+                                    {% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <small>Select any bus from the fleet</small>
+                    </div>
+
+                    <div class="form-field">
+                        <label for="date">Date *</label>
+                        <input type="date" id="date" name="date" 
+                               value="{{ today|date:'Y-m-d' }}" required>
+                        <small>Date when bus will be on spare duty</small>
+                    </div>
+
+                    <div class="form-field">
+                        <label for="spare_start_time">Spare Start Time *</label>
+                        <input type="time" id="spare_start_time" 
+                               name="spare_start_time" value="08:00" required>
+                        <small>When spare duty begins</small>
+                    </div>
+
+                    <div class="form-field">
+                        <label for="spare_end_time">Spare End Time *</label>
+                        <input type="time" id="spare_end_time" 
+                               name="spare_end_time" value="18:00" required>
+                        <small>When spare duty ends</small>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button type="submit" class="btn btn-primary">
+                        ✅ Create Spare Time
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Spare Time Windows List -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">📋 Spare Time Windows</h3>
+            <span style="font-size: 12px; color: #8b949e;">
+                {{ spare_schedules|length }} spare window(s) scheduled
+            </span>
+        </div>
+        <div class="card-content">
+            {% if spare_schedules %}
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Bus</th>
+                            <th>Driver</th>
+                            <th>Date</th>
+                            <th>Spare Window</th>
+                            <th>Duration</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for spare in spare_schedules %}
+                        <tr>
+                            <td class="mono">{{ spare.bus.number_plate }}</td>
+                            <td>
+                                {% if spare.bus.permanent_driver.first %}
+                                    {{ spare.bus.permanent_driver.first.get_full_name|default:spare.bus.permanent_driver.first.email }}
+                                {% else %}
+                                    <span style="color: #6e7681;">No driver</span>
+                                {% endif %}
+                            </td>
+                            <td class="mono">{{ spare.date }}</td>
+                            <td class="mono">
+                                {{ spare.spare_start_time|time:"H:i" }} – 
+                                {{ spare.spare_end_time|time:"H:i" }}
+                            </td>
+                            <td class="mono">{{ spare.duration_hours }}h</td>
+                            <td>
+                                {% if spare.status == 'waiting' %}
+                                    <span class="badge badge-waiting">⏳ Waiting</span>
+                                {% elif spare.status == 'active' %}
+                                    <span class="badge badge-active">✓ Active</span>
+                                {% elif spare.status == 'dispatched' %}
+                                    <span class="badge badge-completed">🚌 Dispatched</span>
+                                {% elif spare.status == 'completed' %}
+                                    <span class="badge badge-completed">✓ Completed</span>
+                                {% else %}
+                                    {{ spare.status }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if spare.status in 'waiting,active' %}
+                                    <form method="post" 
+                                          action="{% url 'delete-spare-assignment' spare.id %}" 
+                                          style="display: inline;"
+                                          onsubmit="return confirm('Delete this spare time window?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-danger" style="font-size: 11px; padding: 4px 8px;">
+                                            Delete
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <span style="color: #6e7681; font-size: 12px;">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="empty-state">
+                    <div class="empty-icon">📭</div>
+                    <div>No spare time windows created yet.</div>
+                    <div style="font-size: 12px; color: #6e7681; margin-top: 8px;">
+                        Use the form above to create spare duty schedules for your buses.
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Info Card -->
+    <div class="alert alert-info">
+        <strong>ℹ️ About Spare Duty:</strong><br>
+        • Spare duty windows define when buses are available for emergency use<br>
+        • Set multiple windows per bus for different days/times<br>
+        • Status automatically changes: Waiting → Active → Completed
+    </div>
+
+</div>
+
+</body>
+</html>

@@ -47,4 +47,7 @@ urlpatterns = [
     path('drivers/', views.manage_drivers, name='manage-drivers'),
     path('drivers/add/', views.add_driver, name='add-driver'),
     path('drivers/edit/<int:driver_id>/', views.edit_driver, name='edit-driver'),
+    path('spare-buses/', views.spare_bus_management, name='spare-bus-management'),
+    path('spare-buses/create/', views.create_spare_assignment, name='create-spare-assignment'),
+    path('spare-buses/delete/<int:spare_id>/', views.delete_spare_assignment, name='delete-spare-assignment'),
 ]
