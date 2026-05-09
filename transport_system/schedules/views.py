@@ -12,7 +12,7 @@ from django.utils import timezone
 from datetime import timedelta,datetime,time,date
 import math
 from django.views.decorators.csrf import csrf_exempt
-
+from django.db import models
 from .models import Schedule, Bus, Ticket
 from routes.models import Stop
 from .serializers import ScheduleSerializer, LiveBusSerializer, BusLocationSerializer
@@ -75,26 +75,28 @@ class ScheduleListView(generics.ListAPIView):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def driver_schedules_view(request):
-    """
-    API view to get schedules for logged-in driver
-    
-    GET /api/schedules/driver/
-    """
     if getattr(request.user, "role", None) != 'driver':
         return Response(
             {'error': 'Only drivers can access this endpoint'},
             status=status.HTTP_403_FORBIDDEN
         )
-    
-    today = timezone.now().date()
+
+    now_local = timezone.localtime(timezone.now())
+    today = now_local.date()
+    now_time = now_local.time()
+
     schedules = (
         Schedule.objects
-        .filter(driver=request.user, date__gte=today)
+        .filter(driver=request.user)
+        .filter(
+            Q(date=today, departure_time__gte=now_time) |
+            Q(date__gt=today)
+        )
         .exclude(status='completed')
         .select_related('route', 'bus')
         .order_by('date', 'departure_time')
     )
-    
+
     serializer = ScheduleSerializer(schedules, many=True)
     return Response(serializer.data)
 
