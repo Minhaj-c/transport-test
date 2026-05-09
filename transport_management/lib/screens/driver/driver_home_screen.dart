@@ -20,6 +20,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   bool _hasSpareToday = false;
   bool _isSpareActive = false;
   bool _isSpareDispatched = false;
+  bool _isSpareCompleted = false; // ✅ new
+  bool _showSpareButton = false;  // ✅ new
   String _spareStart = '';
   String _spareEnd = '';
   int _spareRemainingMin = 0;
@@ -37,11 +39,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
       final status = await ApiService.getSpareStatus();
       if (!mounted) return;
       setState(() {
-        _hasSpareToday = status['has_spare'] ?? false;
-        _isSpareActive = status['is_active'] ?? false;
+        _hasSpareToday     = status['has_spare'] ?? false;
+        _isSpareActive     = status['is_active'] ?? false;
         _isSpareDispatched = status['is_dispatched'] ?? false;
-        _spareStart = status['spare_start'] ?? '';
-        _spareEnd = status['spare_end'] ?? '';
+        _isSpareCompleted  = status['is_completed'] ?? false; // ✅ new
+        _showSpareButton   = status['show_spare_button'] ?? false; // ✅ new
+        _spareStart        = status['spare_start'] ?? '';
+        _spareEnd          = status['spare_end'] ?? '';
         _spareRemainingMin = status['remaining_minutes'] ?? 0;
       });
     } catch (e) {
@@ -57,10 +61,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
       if (!mounted) return;
       setState(() {
-        _isSpareActive = true;
+        _isSpareActive     = true;
+        _showSpareButton   = false; // ✅ hide button once activated
         _spareRemainingMin = result['remaining_minutes'] ?? 0;
-        _spareEnd = result['spare_end_time'] ?? _spareEnd;
-        _isEnteringSpare = false;
+        _spareEnd          = result['spare_end_time'] ?? _spareEnd;
+        _isEnteringSpare   = false;
       });
 
       _showSnack(
@@ -82,13 +87,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
       if (!mounted) return;
       setState(() {
-        _isSpareActive = false;
-        _isExitingSpare = false;
+        _isSpareActive    = false;
+        _isSpareCompleted = true; // ✅ mark completed so banner hides
+        _isExitingSpare   = false;
       });
 
       _showSnack('Spare mode deactivated', Colors.green);
-      
-      // Reload status
+
+      // Reload to get latest status from backend
       _loadSpareStatus();
     } catch (e) {
       if (!mounted) return;
@@ -155,16 +161,18 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         children: [
           // ── SPARE BUS BANNER ─────────────────────────────────
           _SpareBusBanner(
-            hasSpareToday: _hasSpareToday,
-            isSpareActive: _isSpareActive,
+            hasSpareToday:     _hasSpareToday,
+            isSpareActive:     _isSpareActive,
             isSpareDispatched: _isSpareDispatched,
-            spareStart: _spareStart,
-            spareEnd: _spareEnd,
-            remainingMinutes: _spareRemainingMin,
-            isEntering: _isEnteringSpare,
-            isExiting: _isExitingSpare,
-            onEnterSpare: _enterSpareMode,
-            onExitSpare: _exitSpareMode,
+            isSpareCompleted:  _isSpareCompleted,  // ✅ new
+            showSpareButton:   _showSpareButton,   // ✅ new
+            spareStart:        _spareStart,
+            spareEnd:          _spareEnd,
+            remainingMinutes:  _spareRemainingMin,
+            isEntering:        _isEnteringSpare,
+            isExiting:         _isExitingSpare,
+            onEnterSpare:      _enterSpareMode,
+            onExitSpare:       _exitSpareMode,
           ),
 
           // ── Main screen content ───────────────────────────────
@@ -208,8 +216,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            Text(authProvider.user?.email ?? '',
-                style: TextStyle(color: Colors.grey[600])),
+            Text(
+              authProvider.user?.email ?? '',
+              style: TextStyle(color: Colors.grey[600]),
+            ),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -229,8 +239,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Close')),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
@@ -252,6 +263,8 @@ class _SpareBusBanner extends StatelessWidget {
   final bool hasSpareToday;
   final bool isSpareActive;
   final bool isSpareDispatched;
+  final bool isSpareCompleted;  // ✅ new
+  final bool showSpareButton;   // ✅ new
   final String spareStart;
   final String spareEnd;
   final int remainingMinutes;
@@ -264,6 +277,8 @@ class _SpareBusBanner extends StatelessWidget {
     required this.hasSpareToday,
     required this.isSpareActive,
     required this.isSpareDispatched,
+    required this.isSpareCompleted,  // ✅ new
+    required this.showSpareButton,   // ✅ new
     required this.spareStart,
     required this.spareEnd,
     required this.remainingMinutes,
@@ -275,7 +290,8 @@ class _SpareBusBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!hasSpareToday) return const SizedBox.shrink();
+    // ✅ Hide banner completely if no spare today or spare is completed/expired
+    if (!hasSpareToday || isSpareCompleted) return const SizedBox.shrink();
 
     // ── State 1: Dispatched ────────────────────────────────────
     if (isSpareDispatched) {
@@ -302,7 +318,7 @@ class _SpareBusBanner extends StatelessWidget {
       );
     }
 
-    // ── State 2: Active (waiting for dispatch) WITH EXIT BUTTON ─────
+    // ── State 2: Active (waiting for dispatch) ─────────────────
     if (isSpareActive) {
       return Container(
         width: double.infinity,
@@ -329,7 +345,8 @@ class _SpareBusBanner extends StatelessWidget {
               style: TextButton.styleFrom(
                 foregroundColor: Colors.white,
                 backgroundColor: Colors.orange[900],
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 disabledBackgroundColor: Colors.orange[800],
               ),
               icon: isExiting
@@ -353,6 +370,9 @@ class _SpareBusBanner extends StatelessWidget {
     }
 
     // ── State 3: Not yet activated ─────────────────────────────
+    // ✅ Hide if spare window has already passed (showSpareButton = false)
+    if (!showSpareButton) return const SizedBox.shrink();
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
@@ -379,8 +399,10 @@ class _SpareBusBanner extends StatelessWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.orange[700],
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              textStyle: const TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.bold),
               disabledBackgroundColor: Colors.grey,
             ),
             icon: isEntering

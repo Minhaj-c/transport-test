@@ -715,18 +715,11 @@ def enter_spare_mode(request):
 @api_view(['GET'])
 @authentication_classes([CsrfExemptSessionAuthentication])
 def get_spare_status(request):
-    """
-    Get spare status for driver.
-    GET /api/schedules/spare/status/
-    """
     user = request.user
     today = timezone.now().date()
 
     if not user.is_authenticated:
-        return Response({
-            'has_spare': False, 
-            'message': 'Not logged in'
-        })
+        return Response({'has_spare': False, 'message': 'Not logged in'})
 
     today_schedule = Schedule.objects.filter(
         driver=user,
@@ -734,10 +727,7 @@ def get_spare_status(request):
     ).select_related('bus').first()
 
     if not today_schedule:
-        return Response({
-            'has_spare': False, 
-            'message': 'No schedule today'
-        })
+        return Response({'has_spare': False, 'message': 'No schedule today'})
 
     spare = SpareBusSchedule.objects.filter(
         bus=today_schedule.bus,
@@ -746,6 +736,14 @@ def get_spare_status(request):
 
     if not spare:
         return Response({'has_spare': False})
+
+    # ✅ Auto-expire if current time passed spare_end_time
+    now_local = timezone.localtime(timezone.now())
+    now_time = now_local.time()
+
+    if spare.status in ['waiting', 'active'] and now_time > spare.spare_end_time:
+        spare.status = 'completed'
+        spare.save(update_fields=['status'])
 
     return Response({
         'has_spare': True,
@@ -756,9 +754,10 @@ def get_spare_status(request):
         'remaining_minutes': spare.remaining_minutes,
         'is_active': spare.status == 'active',
         'is_dispatched': spare.status == 'dispatched',
+        'is_completed': spare.status == 'completed',  # ✅ new field
+        'show_spare_button': spare.status == 'waiting' and now_time <= spare.spare_end_time,  # ✅ new field
     })
-
-
+    
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 @authentication_classes([CsrfExemptSessionAuthentication])
