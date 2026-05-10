@@ -86,7 +86,6 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
           _startLocationTracking(matched);
           return;
         } else {
-          // Active schedule not found — it was completed and removed from list
           await _clearPersistedRunningState();
           _isRunning      = false;
           _activeSchedule = null;
@@ -106,6 +105,20 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
           _isLoading = false;
         });
       }
+    }
+  }
+
+  // ✅ Reload list only — does NOT touch active card state
+  Future<void> _reloadSchedulesKeepActive() async {
+    try {
+      final schedules = await ApiService.getDriverSchedules();
+      if (!mounted) return;
+      setState(() {
+        _schedules = schedules;
+        // _isRunning and _activeSchedule are intentionally NOT changed
+      });
+    } catch (e) {
+      print('Background reload error: $e');
     }
   }
 
@@ -367,7 +380,6 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
                             );
                             print('✅ Current stop updated: $resp');
 
-                            // ✅ Auto-stop when last stop reached
                             if (resp['route_complete'] == true) {
                               await _clearPersistedRunningState();
                               if (mounted) {
@@ -460,7 +472,9 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
             duration: const Duration(seconds: 6),
           ),
         );
-        await _loadSchedules();
+        // ✅ FIX: Only reload list, keep active card intact
+        // Bus1 is still running spare trip — do NOT reset active state
+        await _reloadSchedulesKeepActive();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -562,6 +576,12 @@ class DriverScheduleScreenState extends State<DriverScheduleScreen>
                       final isToday = schedule.date.year == now.year &&
                           schedule.date.month == now.month &&
                           schedule.date.day == now.day;
+
+                      // ✅ FIX: Don't show covered_by_spare cards in list
+                      // They are already handled — no need to confuse driver
+                      if (schedule.status == 'covered_by_spare') {
+                        return const SizedBox.shrink();
+                      }
 
                       return _ScheduleCard(
                         schedule: schedule,

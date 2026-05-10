@@ -82,24 +82,26 @@ def driver_schedules_view(request):
         )
 
     now_local = timezone.localtime(timezone.now())
-    today = now_local.date()
-    now_time = now_local.time()
+    today     = now_local.date()
+    now_time  = now_local.time()
 
     schedules = (
         Schedule.objects
         .filter(driver=request.user)
         .filter(
             Q(date=today, departure_time__gte=now_time) |
-            Q(date__gt=today)
+            Q(date__gt=today) |
+            Q(date=today, status='running') |
+            Q(date=today, is_spare_trip=True, status='scheduled')
         )
         .exclude(status='completed')
+        .exclude(status='covered_by_spare')
         .select_related('route', 'bus')
         .order_by('date', 'departure_time')
     )
 
     serializer = ScheduleSerializer(schedules, many=True)
     return Response(serializer.data)
-
 
 @api_view(['GET'])
 def nearby_buses(request):
@@ -962,9 +964,21 @@ def report_delayed_arrival(request):
     
     print(f"✅ Found spare: {best_spare.bus.number_plate} ({best_spare.remaining_minutes} min)")
     
-    spare_bus_driver = CustomUser.objects.filter(
-        role='driver'
-    ).exclude(id=user.id).first()
+    spare_bus_driver = None
+    
+    spare_bus_today_schedule = Schedule.objects.filter(
+        bus = best_spare.bus,
+        date = today,
+        is_spare_trip=False
+    ).select_related('driver').first()
+    
+    if spare_bus_today_schedule:
+        spare_bus_driver=spare_bus_today_schedule.driver
+        
+    if not spare_bus_driver:
+        spare_bus_driver = CustomUser.objects.filter(
+            role= 'driver'
+        ).exclude(id=user.id).first()    
     
     if not spare_bus_driver:
         spare_bus_driver = user

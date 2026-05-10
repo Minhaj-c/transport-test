@@ -113,6 +113,7 @@ class ScheduleSerializer(serializers.ModelSerializer):
             "next_stop_sequence",
             "next_stop_name",
             "is_spare_trip",
+            "status",
         ]
     
     def get_driver(self, obj):

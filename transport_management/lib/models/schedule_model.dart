@@ -15,19 +15,22 @@ class Schedule {
   // Nullable values coming from backend
   final int? currentPassengers;
   final DateTime? lastPassengerUpdate;
-  final bool? isRunning; // (may be null if backend doesn't send it)
-  final String? nextStopNameLegacy; // legacy field if backend ever used it
+  final bool? isRunning;
+  final String? nextStopNameLegacy;
 
   // Prediction / extra info (may be null)
   final int? overflowLoad;
   final int? maxLoad;
 
-  // 🔥 NEW – live stop fields from backend ScheduleSerializer
+  // 🔥 Live stop fields from backend ScheduleSerializer
   final int? currentStopSequence;
   final String? currentStopName;
   final int? nextStopSequence;
   final String? nextStopName;
   final bool isSpareTrip;
+
+  // ✅ NEW: status field from backend
+  final String status;
 
   Schedule({
     required this.id,
@@ -50,6 +53,7 @@ class Schedule {
     this.nextStopSequence,
     this.nextStopName,
     this.isSpareTrip = false,
+    this.status = 'scheduled', // ✅ default value
   });
 
   factory Schedule.fromJson(Map<String, dynamic> json) {
@@ -80,21 +84,30 @@ class Schedule {
       currentPassengers: json['current_passengers'] as int?,
       lastPassengerUpdate: lastUpdate,
       isRunning: json['is_running'] as bool?,
-      nextStopNameLegacy: json['next_stop_name'] as String?, // legacy
+      nextStopNameLegacy: json['next_stop_name'] as String?,
 
       overflowLoad: json['overflow_load'] as int?,
       maxLoad: json['max_load'] as int?,
 
-      // 🔥 Live-stop fields (same keys as ScheduleSerializer)
+      // Live stop fields
       currentStopSequence: json['current_stop_sequence'] as int?,
       currentStopName: json['current_stop_name'] as String?,
       nextStopSequence: json['next_stop_sequence'] as int?,
       nextStopName: json['next_stop_name'] as String?,
       isSpareTrip: json['is_spare_trip'] as bool? ?? false,
+
+      // ✅ NEW: parse status from backend
+      status: json['status'] as String? ?? 'scheduled',
     );
   }
 
-  // 👉 Always gives a safe, non-null number.
+  // ✅ Convenience getters for status checks
+  bool get isCoveredBySpare => status == 'covered_by_spare';
+  bool get isCompleted => status == 'completed';
+  bool get isCancelled => status == 'cancelled';
+  bool get isRunningStatus => status == 'running';
+
+  // Always gives a safe, non-null number
   int get livePassengers {
     if (currentPassengers != null) {
       return currentPassengers!;
